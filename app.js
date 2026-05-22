@@ -551,11 +551,6 @@ function renderList() {
     .sort((a, b) => a.dateStr.localeCompare(b.dateStr)),
 ];
 
-      const hdr = document.createElement('div');
-      hdr.className = 'section-header';
-      hdr.innerHTML = `<div class="section-title">${cat.label}</div><div class="section-line"></div>`;
-      wrap.appendChild(hdr);
-
       if (cat.announceMid) {
         const mid = document.createElement('div');
         mid.className = 'announce-mid';
@@ -563,10 +558,20 @@ function renderList() {
         wrap.appendChild(mid);
       }
 
-      const list = document.createElement('div');
-      list.className = 'course-list';
-      catCourses.forEach(c => list.appendChild(buildCard(c)));
-      wrap.appendChild(list);
+      cat.subcats.forEach(subcat => {
+        const subCourses = catCourses.filter(c => c.subcat === subcat);
+        if (!subCourses.length) return;
+
+        const subHdr = document.createElement('div');
+        subHdr.className = 'section-header';
+        subHdr.innerHTML = `<div class="section-title">${subcat}</div><div class="section-line"></div>`;
+        wrap.appendChild(subHdr);
+
+        const list = document.createElement('div');
+        list.className = 'course-list';
+        subCourses.forEach(c => list.appendChild(buildCard(c)));
+        wrap.appendChild(list);
+      });
     });
   }
 }
