@@ -174,6 +174,85 @@ const courses = [
 const bookings = {};
 courses.forEach(c => bookings[c.id] = []);
 
+// ── LOCALSTORAGE ──
+function saveToStorage() {
+  try {
+    localStorage.setItem('bookings', JSON.stringify(bookings));
+    localStorage.setItem('courses_extra', JSON.stringify(
+      courses.map(c => ({
+        id: c.id, open: c.open, announceSmall: c.announceSmall,
+        showRoster: c.showRoster, minSpots: c.minSpots, maxSpots: c.maxSpots,
+        title: c.title, dateStr: c.dateStr, date: c.date, time: c.time,
+        location: c.location, locationDetail: c.locationDetail,
+        price: c.price, desc: c.desc
+      }))
+    ));
+    // 儲存新增的課程（id 超過原始最大值的）
+    const extraCourses = courses.filter(c => c.id > 15);
+    if (extraCourses.length) {
+      localStorage.setItem('courses_added', JSON.stringify(extraCourses));
+    }
+    // 儲存公告
+    localStorage.setItem('categories_announce', JSON.stringify(
+      categories.map(c => ({ id: c.id, announceMid: c.announceMid }))
+    ));
+    localStorage.setItem('homeSections_text', JSON.stringify(
+      Object.fromEntries(Object.entries(homeSections).map(([k,v]) => [k, v.text]))
+    ));
+    localStorage.setItem('globalNotice', document.getElementById('globalNotice').innerHTML);
+  } catch(e) { console.warn('儲存失敗', e); }
+}
+
+function loadFromStorage() {
+  try {
+    // 讀取報名名單
+    const savedBookings = localStorage.getItem('bookings');
+    if (savedBookings) {
+      const parsed = JSON.parse(savedBookings);
+      Object.assign(bookings, parsed);
+    }
+    // 讀取課程異動（編輯欄位）
+    const savedExtra = localStorage.getItem('courses_extra');
+    if (savedExtra) {
+      const parsed = JSON.parse(savedExtra);
+      parsed.forEach(saved => {
+        const c = courses.find(x => x.id === saved.id);
+        if (c) Object.assign(c, saved);
+      });
+    }
+    // 讀取新增課程
+    const savedAdded = localStorage.getItem('courses_added');
+    if (savedAdded) {
+      const added = JSON.parse(savedAdded);
+      added.forEach(nc => {
+        if (!courses.find(c => c.id === nc.id)) {
+          courses.push(nc);
+          if (!bookings[nc.id]) bookings[nc.id] = [];
+        }
+      });
+    }
+    // 讀取公告
+    const savedAnnounce = localStorage.getItem('categories_announce');
+    if (savedAnnounce) {
+      JSON.parse(savedAnnounce).forEach(saved => {
+        const cat = categories.find(c => c.id === saved.id);
+        if (cat) cat.announceMid = saved.announceMid;
+      });
+    }
+    const savedSections = localStorage.getItem('homeSections_text');
+    if (savedSections) {
+      const parsed = JSON.parse(savedSections);
+      Object.entries(parsed).forEach(([k, v]) => {
+        if (homeSections[k]) homeSections[k].text = v;
+      });
+    }
+    const savedNotice = localStorage.getItem('globalNotice');
+    if (savedNotice) {
+      document.getElementById('globalNotice').innerHTML = savedNotice;
+    }
+  } catch(e) { console.warn('讀取失敗', e); }
+}
+
 let currentCat = 'all';
 let currentCourse = null;
 let currentView = 'calendar';
@@ -368,6 +447,7 @@ function renderList() {
       });
       editSection.querySelector(`#csaveSmall_${c.id}`).addEventListener('click', () => {
         c.announceSmall = editSection.querySelector(`#csmall_${c.id}`).value.trim();
+        saveToStorage();
         alert('備註已儲存！');
       });
 
@@ -391,6 +471,7 @@ function renderList() {
         if (!isNaN(maxVal) && maxVal >= 1) c.maxSpots = maxVal;
         c.open = editSection.querySelector(`#cardToggle_${c.id}`).checked;
         c.desc = editSection.querySelector(`#cdesc_${c.id}`).value.trim();
+        saveToStorage();
         alert(`已儲存「${c.title}」`);
       });
 
@@ -602,6 +683,7 @@ function bindModalRosterEvents(course) {
     btn.addEventListener('click', () => {
       const idx = parseInt(btn.dataset.index);
       bookings[course.id].splice(idx, 1);
+      saveToStorage();
       openModal(course);
       if (currentView === 'calendar') renderCalendar(); else renderList();
     });
@@ -626,6 +708,7 @@ function bindModalRosterEvents(course) {
     const phone = document.getElementById('modalAddPhone').value.trim();
     const now = new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' });
     bookings[course.id].push({ name, phone, time: now });
+    saveToStorage();
     openModal(course);
     if (currentView === 'calendar') renderCalendar(); else renderList();
   });
@@ -696,6 +779,7 @@ function handleBooking() {
   const phone = document.getElementById('bookPhone').value.trim();
   const now = new Date().toLocaleTimeString('zh-TW', {hour:'2-digit', minute:'2-digit'});
   bookings[currentCourse.id].push({ name, phone, time: now });
+  saveToStorage();
 
   document.getElementById('modalContent').innerHTML = `
     <div class="success-box">
@@ -834,6 +918,7 @@ function renderAdmin() {
     homeSection.appendChild(bigCard);
     document.getElementById('saveBigAnn').addEventListener('click', () => {
       document.getElementById('globalNotice').innerHTML = document.getElementById('bigAnnounce').value.trim();
+      saveToStorage();
       alert('大公告已儲存！');
     });
 
@@ -857,6 +942,7 @@ function renderAdmin() {
       document.getElementById(`saveBtn_${s.id}`).addEventListener('click', () => {
         s.text = document.getElementById(`sec_${s.id}`).value.trim();
         renderHomeSections();
+        saveToStorage();
         alert(`「${s.title}」已儲存！`);
       });
     });
@@ -898,6 +984,7 @@ function renderAdmin() {
       });
       document.getElementById(`saveMid_${cat.id}`).addEventListener('click', () => {
         cat.announceMid = document.getElementById(midId).value.trim();
+        saveToStorage();
         alert(`已儲存「${cat.label}」課程公告`);
       });
     });
@@ -1024,6 +1111,7 @@ function renderAdmin() {
       };
       courses.push(newCourse);
       bookings[newId] = [];
+      saveToStorage();
       if (currentView === 'calendar') renderCalendar(); else renderList();
       alert(`「${titleVal}」已新增！`);
       renderCourseSection();
@@ -1044,5 +1132,6 @@ function renderHomeSections() {
 }
 
 // ── INIT初始化 ──
+loadFromStorage();
 renderCalendar();
 renderHomeSections();
