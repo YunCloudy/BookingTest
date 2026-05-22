@@ -340,7 +340,7 @@ function renderList() {
         <div class="card-date">${c.date} ${c.time}</div>
         <div class="card-title">${c.title}</div>
         <div class="card-location">📍 ${c.location}</div>
-        ${isAdmin() ? `<button class="edit-toggle-btn" id="cardEditBtn_${c.id}">✏️ 編輯</button>` : ''}
+        ${isAdmin() ? `<div style="display:flex;gap:6px;margin-top:4px"><button class="edit-toggle-btn" id="cardEditBtn_${c.id}">✏️ 編輯</button><button class="edit-toggle-btn" id="ccopy_${c.id}">📋 複製</button></div>` : ''}
       </div>
       <div class="card-spots">${spotsHtml}</div>
     `;
@@ -411,7 +411,6 @@ function renderList() {
             <button class="save-announce" id="csaveSmall_${c.id}">儲存備註</button>
           </div>
           <button class="save-announce cei-save-main" id="csaveCourse_${c.id}">儲存</button>
-          <button class="edit-toggle-btn" id="ccopy_${c.id}" style="width:100%;margin-top:8px">📋 複製此課程</button>
           <div class="roster-list">
             <div class="roster-section-title">
               已報名學員（${bookedList.length} 人）
@@ -481,8 +480,8 @@ function renderList() {
         document.getElementById(`showRosterLabel_${c.id}`).textContent = c.showRoster ? '學員可見' : '學員不可見';
       });
 
-      editSection.querySelector(`#ccopy_${c.id}`).addEventListener('click', () => {
-        // 切到課程管理 tab
+      card.querySelector(`#ccopy_${c.id}`).addEventListener('click', (e) => {
+        e.stopPropagation();
         const adminTabs = document.querySelectorAll('.admin-tab');
         adminTabs.forEach(b => b.classList.remove('active'));
         const courseTab = [...adminTabs].find(b => b.dataset.tab === 'course');
@@ -491,8 +490,6 @@ function renderList() {
           document.getElementById('adminHomeSection').style.display = 'none';
           document.getElementById('adminCourseSection').style.display = 'block';
         }
-
-        // 填入資料（日期清空）
         setTimeout(() => {
           const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
           setVal('newTitle', c.title);
@@ -504,8 +501,6 @@ function renderList() {
           setVal('newMinSpots', c.minSpots ?? 0);
           setVal('newMaxSpots', c.maxSpots);
           setVal('newDesc', c.desc);
-
-          // 分類
           const catSel = document.getElementById('newCat');
           if (catSel) {
             catSel.value = c.cat;
@@ -515,15 +510,11 @@ function renderList() {
               if (subSel) subSel.value = c.subcat;
             }, 50);
           }
-
-          // 報名開關
           const openChk = document.getElementById('newOpen');
           if (openChk) {
             openChk.checked = c.open;
             document.getElementById('newOpenLabel').textContent = c.open ? '開放報名' : '關閉報名';
           }
-
-          // 捲到新增表單
           document.getElementById('confirmAddCourse')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }, 100);
       });
