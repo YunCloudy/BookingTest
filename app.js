@@ -527,6 +527,7 @@ function renderList() {
           document.getElementById('confirmAddCourse')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }, 100);
       });
+    }
 
     return wrapper;
   }
