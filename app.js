@@ -8,7 +8,7 @@ const categories = [
     id: 'pilates',
     label: '皮拉提斯',
     subcats: ['器械皮拉提斯', '墊上皮拉提斯'],
-    announceMid: '因教室租借費用調漲，費用有調整，感謝大家的支持與理解 🙏'
+    announceMid: '因教室租借費用調漲，費用有調整喔🙏'
   },
   {
     id: 'aerial',
@@ -696,9 +696,7 @@ function renderDayDetail(dateStr, dayCourses) {
   detail.querySelectorAll('.day-course-item').forEach(el => {
     el.addEventListener('click', () => {
       const c = courses.find(x => x.id === +el.dataset.id);
-      if (!c) return;
-      if (el.classList.contains('is-full') && !isAdmin()) return;
-      openModal(c);
+      if (c) openModal(c);
     });
   });
 }
