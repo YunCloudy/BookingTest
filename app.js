@@ -199,7 +199,8 @@ function saveToStorage() {
     localStorage.setItem('homeSections_text', JSON.stringify(
       Object.fromEntries(Object.entries(homeSections).map(([k,v]) => [k, v.text]))
     ));
-    localStorage.setItem('globalNotice', document.getElementById('globalNotice').innerHTML);
+    localStorage.setItem('globalNoticeTitle', document.getElementById('globalNoticeTitle')?.innerText.trim() || '');
+    localStorage.setItem('globalNoticeBody', document.getElementById('globalNoticeBody')?.innerText.trim() || '');
   } catch(e) { console.warn('儲存失敗', e); }
 }
 
@@ -246,10 +247,14 @@ function loadFromStorage() {
         if (homeSections[k]) homeSections[k].text = v;
       });
     }
-    const savedNotice = localStorage.getItem('globalNotice');
-    if (savedNotice) {
-      document.getElementById('globalNotice').innerHTML = savedNotice;
-    }
+    const savedTitle = localStorage.getItem('globalNoticeTitle') || '';
+    const savedBody = localStorage.getItem('globalNoticeBody') || '';
+    const noticeTitleEl = document.getElementById('globalNoticeTitle');
+    const noticeBodyEl = document.getElementById('globalNoticeBody');
+    const noticeWrap = document.getElementById('globalNoticeWrap');
+    if (noticeTitleEl && savedTitle) noticeTitleEl.innerText = savedTitle;
+   if (noticeBodyEl && savedBody) noticeBodyEl.innerText = savedBody;
+   if (noticeWrap) noticeWrap.style.display = (noticeTitleEl?.innerText || noticeBodyEl?.innerText) ? '' : 'none';
   } catch(e) { console.warn('讀取失敗', e); }
 }
 
@@ -565,7 +570,7 @@ function renderList() {
       if (cat.announceMid) {
         const mid = document.createElement('div');
         mid.className = 'announce-mid';
-        mid.innerHTML = `<div class="announce-mid-title">📢 課程公告</div>${cat.announceMid}`;
+        mid.innerHTML = `<div class="announce-mid-title">📢 ${cat.label}課程公告</div>${cat.announceMid}`;
         wrap.appendChild(mid);
       }
 
@@ -964,16 +969,25 @@ function renderAdmin() {
     const bigCard = document.createElement('div');
     bigCard.className = 'admin-card';
     bigCard.innerHTML = `
+      <div class="admin-hint">顯示在首頁最上方，標題與內容皆留空則不顯示</div>
       <div class="admin-announce">
-        <div class="admin-hint">顯示在首頁最上方</div>
-        <textarea id="bigAnnounce" placeholder="留空則不顯示">${document.getElementById('globalNotice').innerText}</textarea>
+        <input type="text" id="bigAnnounceTitle" class="admin-announce-title-input" placeholder="請輸入公告標題" value="${localStorage.getItem('globalNoticeTitle') || document.getElementById('globalNoticeTitle')?.innerText || ''}">
+        <textarea id="bigAnnounce" placeholder="請輸入公告內容">${localStorage.getItem('globalNoticeBody') || document.getElementById('globalNoticeBody')?.innerText || ''}</textarea>
         <button class="save-announce" id="saveBigAnn">儲存</button>
       </div>
     `;
     homeSection.appendChild(bigCard);
     document.getElementById('saveBigAnn').addEventListener('click', () => {
-      document.getElementById('globalNotice').innerHTML = document.getElementById('bigAnnounce').value.trim();
-      saveToStorage();
+      const title = document.getElementById('bigAnnounceTitle').value.trim();
+      const body = document.getElementById('bigAnnounce').value.trim();
+      const noticeTitleEl = document.getElementById('globalNoticeTitle');
+      const noticeBodyEl = document.getElementById('globalNoticeBody');
+      const noticeWrap = document.getElementById('globalNoticeWrap');
+      if (noticeTitleEl) noticeTitleEl.innerText = title;
+      if (noticeBodyEl) noticeBodyEl.innerText = body;
+      if (noticeWrap) noticeWrap.style.display = (title || body) ? '' : 'none';
+      localStorage.setItem('globalNoticeTitle', title);
+      localStorage.setItem('globalNoticeBody', body);
       alert('大公告已儲存！');
     });
 
