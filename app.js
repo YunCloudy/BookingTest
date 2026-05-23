@@ -33,7 +33,7 @@ const homeSections = {
 };
 
 // 小公告：每堂課自己的備註
-const courses = [
+let courses = [
   {
     id: 1, cat: 'aerial', subcat: '常態團課',
     dateStr: '2026-05-20', date: '5/20（三）', time: '18:10~19:10',
@@ -340,7 +340,7 @@ function renderList() {
         <div class="card-date">${c.date} ${c.time}</div>
         <div class="card-title">${c.title}</div>
         <div class="card-location">📍 ${c.location}</div>
-        ${isAdmin() ? `<div style="display:flex;gap:6px;margin-top:4px"><button class="edit-toggle-btn" id="cardEditBtn_${c.id}">✏️ 編輯</button><button class="edit-toggle-btn" id="ccopy_${c.id}">📋 複製</button></div>` : ''}
+        ${isAdmin() ? `<div style="display:flex;gap:6px;margin-top:4px"><button class="edit-toggle-btn" id="cardEditBtn_${c.id}">✏️ 編輯</button><button class="edit-toggle-btn" id="ccopy_${c.id}">📋 複製</button><button class="edit-toggle-btn" id="cdelete_${c.id}">🗑️ 刪除</button></div>` : ''}
       </div>
       <div class="card-spots">${spotsHtml}</div>
     `;
@@ -478,6 +478,17 @@ function renderList() {
       editSection.querySelector(`#showRosterToggle_${c.id}`).addEventListener('change', function() {
         c.showRoster = this.checked;
         document.getElementById(`showRosterLabel_${c.id}`).textContent = c.showRoster ? '學員可見' : '學員不可見';
+      });
+
+
+      card.querySelector(`#cdelete_${c.id}`).addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (!confirm(`確定要刪除「${c.title}」嗎？此操作無法復原。`)) return;
+        const idx = courses.findIndex(x => x.id === c.id);
+        if (idx !== -1) courses.splice(idx, 1);
+        delete bookings[c.id];
+        saveToStorage();
+        if (currentView === 'calendar') renderCalendar(); else renderList();
       });
 
       card.querySelector(`#ccopy_${c.id}`).addEventListener('click', (e) => {
