@@ -693,10 +693,12 @@ function renderDayDetail(dateStr, dayCourses) {
   html += '</div>';
   detail.innerHTML = html;
 
-  detail.querySelectorAll('.day-course-item:not(.is-full)').forEach(el => {
+  detail.querySelectorAll('.day-course-item').forEach(el => {
     el.addEventListener('click', () => {
       const c = courses.find(x => x.id === +el.dataset.id);
-      if (c) openModal(c);
+      if (!c) return;
+      if (el.classList.contains('is-full') && !isAdmin()) return;
+      openModal(c);
     });
   });
 }
