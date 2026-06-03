@@ -13,6 +13,7 @@ const firebaseConfig = {
 
 const firebaseApp = initializeApp(firebaseConfig);
 const db = getFirestore(firebaseApp);
+let isLoggedIn = false;
 
 // ── DATA ──
 
