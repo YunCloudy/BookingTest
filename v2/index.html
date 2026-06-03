@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>課程預約</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;600;700&family=Noto+Sans+TC:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- STUDENT VIEW -->
+<div id="studentView">
+  <header>
+    <div>
+      <h1>🌸 課程預約</h1>
+      <div class="subtitle">AERIAL BOOKING</div>
+    </div>
+    <button id="adminBtn">老師登入</button>
+  </header>
+
+  <div class="tabs">
+   <div class="tab active" data-view="calendar">本月課表</div>
+    <div class="tab" data-view="list" data-cat="all">全部課程</div>
+    <div class="tab" data-view="list" data-cat="pilates">皮拉提斯</div>
+    <div class="tab" data-view="list" data-cat="aerial">空中瑜珈</div>
+    <div class="tab" data-view="list" data-cat="circus">旋轉課</div>
+  </div>
+
+  <main>
+    <div class="notice" id="globalNoticeWrap">
+      <div id="globalNoticeTitle" style="font-weight:700;margin-bottom:4px;">🗓 下月報名開放時間</div>
+      <div id="globalNoticeBody">6月課程報名將於 5/25（日）22:00 開放，記得設鬧鐘哦！</div>
+    </div>
+
+    <!-- LIST VIEW -->
+    <div id="listView" style="display:none"></div>
+
+    <!-- CALENDAR VIEW -->
+    <div id="calendarView">
+      <div class="calendar-wrap">
+        <div class="cal-nav">
+          <button id="calPrev">‹</button>
+          <h3 id="calTitle"></h3>
+          <button id="calNext">›</button>
+        </div>
+        <div class="cal-grid" id="calGrid"></div>
+      </div>
+      <div id="dayDetail"></div>
+      <div id="noticeRules" class="notice-rules"></div>
+      <div id="sectionAbout" class="notice-rules"></div>
+      <div id="sectionBooking" class="notice-rules"></div>
+      <div id="sectionCourseIntro" class="notice-rules"></div>
+    </div>
+  </main>
+</div>
+
+<!-- LOGIN MODAL -->
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-box">
+    <div style="font-size:2rem;margin-bottom:8px">💮</div>
+    <h3>老師登入</h3>
+    <p>請輸入管理密碼</p>
+    <input type="password" id="pwInput" placeholder="••••" maxlength="20">
+    <div class="login-error" id="loginError"></div>
+    <button class="btn-primary" id="loginConfirm" style="width:100%">登入</button>
+    <br>
+    <button class="login-cancel" id="loginCancel">取消</button>
+  </div>
+</div>
+
+<!-- ADMIN PANEL -->
+<div id="adminPanel">
+  <div class="admin-header">
+    <h2>🌸 老師管理後台</h2>
+    <button id="closeAdmin">← 返回</button>
+  </div>
+  <div class="admin-body" id="adminBody"></div>
+</div>
+
+<!-- MODAL -->
+<div class="overlay" id="overlay">
+  <div class="modal" id="modal">
+    <div class="modal-handle"></div>
+    <div id="modalContent"></div>
+  </div>
+</div>
+<!-- 登入成功畫面 -->
+<div id="loginSuccess">
+  <div class="login-success-icon">✨</div>
+  <div class="login-success-title">歡迎回來！</div>
+  <div class="login-success-sub">正在進入管理後台…</div>
+</div>
+
+<!-- Firebase CDN -->
+<script type="module" src="app.js"></script>
+</body>
+</html>
