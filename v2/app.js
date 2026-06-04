@@ -1432,7 +1432,7 @@ function renderHomeSections() {
 
 // ── INIT初始化 ──
 (async () => {
-  await getRedirectResult(auth).catch(() => {});
+  const redirectResult = await getRedirectResult(auth); if (redirectResult?.user) {   currentStudent = redirectResult.user;   updateStudentBtn(); }
   await loadFromStorage();
   renderCalendar();
   renderHomeSections();

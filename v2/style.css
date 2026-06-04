@@ -117,7 +117,7 @@ header .subtitle {
 .student-dropdown {
   display: none;
   position: fixed;
-  top: 62px;
+  top: 58px;
   right: 16px;
   background: white;
   border-radius: 12px;
