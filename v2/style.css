@@ -68,6 +68,11 @@ header .subtitle {
   margin-top: 2px;
   letter-spacing: 0.08em;
 }
+.header-btns {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
 #adminBtn {
   background: rgba(255,255,255,0.15);
   border: 1px solid rgba(255,255,255,0.35);
@@ -80,6 +85,33 @@ header .subtitle {
   font-family: 'Noto Sans TC', sans-serif;
 }
 #adminBtn:hover { background: rgba(255,255,255,0.28); }
+#studentBtn {
+  background: rgba(255,255,255,0.15);
+  border: 1px solid rgba(255,255,255,0.35);
+  color: white;
+  padding: 7px 14px;
+  border-radius: 20px;
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: 'Noto Sans TC', sans-serif;
+}
+#studentBtn:hover { background: rgba(255,255,255,0.28); }
+.btn-google {
+  width: 100%;
+  padding: 11px 16px;
+  border: 1.5px solid var(--rose-light);
+  border-radius: 10px;
+  background: white;
+  font-size: 0.9rem;
+  font-family: 'Noto Sans TC', sans-serif;
+  cursor: pointer;
+  color: var(--ink);
+  transition: background 0.15s;
+  margin-bottom: 4px;
+}
+.btn-google:hover { background: var(--latte-pale); }
+.btn-google:disabled { opacity: 0.6; cursor: default; }
 
 /* ── TABS ── */
 .tabs {

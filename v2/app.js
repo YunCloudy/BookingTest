@@ -35,6 +35,7 @@
 // ── FIREBASE ──
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyB2pcS4xZViD7bhP8OpXK-tYAh851szUIE",
@@ -47,11 +48,14 @@ const firebaseConfig = {
 
 const firebaseApp = initializeApp(firebaseConfig);
 const db = getFirestore(firebaseApp);
+const auth = getAuth(firebaseApp);
+const googleProvider = new GoogleAuthProvider();
 
 // ⚠️ 測試用 teacherId，待 Google 登入完成後改為 auth.currentUser.uid
 const teacherId = 'test_aerial';
 
 let isLoggedIn = false;
+let currentStudent = null; // Google 登入的學生
 
 // ── DATA ──
 
@@ -1023,7 +1027,61 @@ function doLogin() {
   }
 }
 
-// ── ADMIN ──
+// ── STUDENT LOGIN ──
+function updateStudentBtn() {
+  const btn = document.getElementById('studentBtn');
+  if (currentStudent) {
+    const name = currentStudent.displayName ? currentStudent.displayName.split(' ')[0] : '學生';
+    btn.textContent = `${name} ▾`;
+  } else {
+    btn.textContent = '學生登入';
+  }
+}
+
+document.getElementById('studentBtn').addEventListener('click', () => {
+  if (currentStudent) {
+    document.getElementById('studentLogoutName').textContent = currentStudent.displayName || '學生';
+    document.getElementById('studentLogoutOverlay').classList.add('open');
+  } else {
+    document.getElementById('studentLoginError').textContent = '';
+    document.getElementById('studentLoginOverlay').classList.add('open');
+  }
+});
+
+document.getElementById('studentLoginCancel').addEventListener('click', () => {
+  document.getElementById('studentLoginOverlay').classList.remove('open');
+});
+
+document.getElementById('googleLoginBtn').addEventListener('click', async () => {
+  const btn = document.getElementById('googleLoginBtn');
+  btn.textContent = '登入中…';
+  btn.disabled = true;
+  document.getElementById('studentLoginError').textContent = '';
+  try {
+    await signInWithPopup(auth, googleProvider);
+    document.getElementById('studentLoginOverlay').classList.remove('open');
+  } catch (e) {
+    document.getElementById('studentLoginError').textContent = '登入失敗，請再試一次';
+    btn.innerHTML = '<img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="18" style="vertical-align:middle;margin-right:8px">以 Google 登入';
+    btn.disabled = false;
+  }
+});
+
+document.getElementById('studentLogoutCancel').addEventListener('click', () => {
+  document.getElementById('studentLogoutOverlay').classList.remove('open');
+});
+
+document.getElementById('studentLogoutConfirm').addEventListener('click', async () => {
+  await signOut(auth);
+  document.getElementById('studentLogoutOverlay').classList.remove('open');
+});
+
+onAuthStateChanged(auth, user => {
+  currentStudent = user;
+  updateStudentBtn();
+});
+
+
 document.getElementById('closeAdmin').addEventListener('click', () => {
   document.getElementById('adminPanel').classList.remove('open');
   document.getElementById('adminBtn').textContent = '老師登入';

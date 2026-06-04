@@ -16,7 +16,10 @@
       <h1>🌸 課程預約</h1>
       <div class="subtitle">AERIAL BOOKING</div>
     </div>
-    <button id="adminBtn">老師登入</button>
+    <div class="header-btns">
+      <button id="studentBtn">學生登入</button>
+      <button id="adminBtn">老師登入</button>
+    </div>
   </header>
 
   <div class="tabs">
@@ -66,6 +69,34 @@
     <button class="btn-primary" id="loginConfirm" style="width:100%">登入</button>
     <br>
     <button class="login-cancel" id="loginCancel">取消</button>
+  </div>
+</div>
+
+<!-- STUDENT LOGIN MODAL -->
+<div class="login-overlay" id="studentLoginOverlay">
+  <div class="login-box">
+    <div style="font-size:2rem;margin-bottom:8px">🌸</div>
+    <h3>學生登入</h3>
+    <p>使用 Google 帳號登入</p>
+    <button class="btn-google" id="googleLoginBtn">
+      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="18" style="vertical-align:middle;margin-right:8px">
+      以 Google 登入
+    </button>
+    <div class="login-error" id="studentLoginError"></div>
+    <br>
+    <button class="login-cancel" id="studentLoginCancel">取消</button>
+  </div>
+</div>
+
+<!-- STUDENT LOGOUT MODAL -->
+<div class="login-overlay" id="studentLogoutOverlay">
+  <div class="login-box">
+    <div style="font-size:2rem;margin-bottom:8px">👋</div>
+    <h3 id="studentLogoutName">登出</h3>
+    <p>確定要登出嗎？</p>
+    <button class="btn-primary" id="studentLogoutConfirm" style="width:100%">登出</button>
+    <br>
+    <button class="login-cancel" id="studentLogoutCancel">取消</button>
   </div>
 </div>
 
