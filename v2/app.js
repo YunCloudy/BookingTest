@@ -1058,7 +1058,6 @@ document.getElementById('googleLoginBtn').addEventListener('click', async () => 
   btn.disabled = true;
   document.getElementById('studentLoginError').textContent = '';
   try {
-    import { signInWithRedirect, getRedirectResult } from "...firebase-auth.js"  
     await signInWithRedirect(auth, googleProvider);
     document.getElementById('studentLoginOverlay').classList.remove('open');
   } catch (e) {
@@ -1379,7 +1378,7 @@ function renderHomeSections() {
 
 // ── INIT初始化 ──
 (async () => {
-  const result = await getRedirectResult(auth);
+  await getRedirectResult(auth).catch(() => {});
   await loadFromStorage();
   renderCalendar();
   renderHomeSections();
