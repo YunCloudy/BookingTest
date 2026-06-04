@@ -88,7 +88,13 @@
   </div>
 </div>
 
-<!-- STUDENT LOGOUT MODAL -->
+<!-- STUDENT DROPDOWN MENU -->
+<div class="student-dropdown" id="studentDropdown">
+  <button class="student-dropdown-item" id="studentProfileBtn">👤 個人資料</button>
+  <button class="student-dropdown-item" id="studentLogoutBtn">🚪 登出</button>
+</div>
+
+<!-- STUDENT LOGOUT CONFIRM -->
 <div class="login-overlay" id="studentLogoutOverlay">
   <div class="login-box">
     <div style="font-size:2rem;margin-bottom:8px">👋</div>
@@ -100,7 +106,25 @@
   </div>
 </div>
 
+<!-- STUDENT PROFILE OVERLAY -->
+<div class="login-overlay" id="studentProfileOverlay">
+  <div class="login-box">
+    <div style="font-size:2rem;margin-bottom:8px">👤</div>
+    <h3>個人資料</h3>
+    <p id="studentProfileEmail" style="font-size:0.78rem;color:#999;margin-bottom:16px"></p>
+    <div style="text-align:left;margin-bottom:6px;font-size:0.82rem;color:#7a6560">暱稱</div>
+    <input type="text" id="studentNicknameInput" placeholder="輸入暱稱" maxlength="20" style="margin-bottom:12px">
+    <button class="btn-primary" id="studentProfileSave" style="width:100%">儲存</button>
+    <br>
+    <button class="login-cancel" id="studentProfileCancel">取消</button>
+  </div>
+</div>
+
+<!-- STUDENT LOGGED OUT NOTICE -->
+<div id="studentLoggedOutNotice" style="display:none;position:fixed;top:70px;left:50%;transform:translateX(-50%);background:#2e2520;color:white;padding:10px 20px;border-radius:20px;font-size:0.82rem;z-index:500">已登出</div>
+
 <!-- ADMIN PANEL -->
+
 <div id="adminPanel">
   <div class="admin-header">
     <h2>🌸 老師管理後台</h2>

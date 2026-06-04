@@ -113,6 +113,38 @@ header .subtitle {
 .btn-google:hover { background: var(--latte-pale); }
 .btn-google:disabled { opacity: 0.6; cursor: default; }
 
+/* ── STUDENT DROPDOWN ── */
+.student-dropdown {
+  display: none;
+  position: fixed;
+  top: 62px;
+  right: 16px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  z-index: 400;
+  min-width: 140px;
+  border: 1px solid var(--rose-light);
+}
+.student-dropdown.open { display: block; }
+.student-dropdown-item {
+  display: block;
+  width: 100%;
+  padding: 14px 18px;
+  background: none;
+  border: none;
+  text-align: left;
+  font-size: 0.88rem;
+  font-family: 'Noto Sans TC', sans-serif;
+  color: var(--ink);
+  cursor: pointer;
+}
+.student-dropdown-item:hover { background: var(--latte-pale); }
+.student-dropdown-item + .student-dropdown-item {
+  border-top: 1px solid var(--rose-light);
+}
+
 /* ── TABS ── */
 .tabs {
   display: flex;

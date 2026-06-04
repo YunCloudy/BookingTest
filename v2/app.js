@@ -1026,26 +1026,35 @@ function doLogin() {
 }
 
 // ── STUDENT LOGIN ──
-function updateStudentBtn() {
+function updateStudentBtn(nickname) {
   const btn = document.getElementById('studentBtn');
   if (currentStudent) {
-    const name = currentStudent.displayName ? currentStudent.displayName.split(' ')[0] : '學生';
+    const name = nickname || (currentStudent.displayName ? currentStudent.displayName.split(' ')[0] : '學生');
     btn.textContent = `${name} ▾`;
   } else {
     btn.textContent = '學生登入';
   }
 }
 
-document.getElementById('studentBtn').addEventListener('click', () => {
+// 學生按鈕 → 登入或下拉選單
+document.getElementById('studentBtn').addEventListener('click', (e) => {
   if (currentStudent) {
-    document.getElementById('studentLogoutName').textContent = currentStudent.displayName || '學生';
-    document.getElementById('studentLogoutOverlay').classList.add('open');
+    const dropdown = document.getElementById('studentDropdown');
+    const isOpen = dropdown.classList.contains('open');
+    dropdown.classList.toggle('open', !isOpen);
+    e.stopPropagation();
   } else {
     document.getElementById('studentLoginError').textContent = '';
     document.getElementById('studentLoginOverlay').classList.add('open');
   }
 });
 
+// 點其他地方關閉下拉
+document.addEventListener('click', () => {
+  document.getElementById('studentDropdown').classList.remove('open');
+});
+
+// 登入
 document.getElementById('studentLoginCancel').addEventListener('click', () => {
   document.getElementById('studentLoginOverlay').classList.remove('open');
 });
@@ -1057,12 +1066,45 @@ document.getElementById('googleLoginBtn').addEventListener('click', async () => 
   document.getElementById('studentLoginError').textContent = '';
   try {
     await signInWithRedirect(auth, googleProvider);
-    document.getElementById('studentLoginOverlay').classList.remove('open');
   } catch (e) {
     document.getElementById('studentLoginError').textContent = '登入失敗，請再試一次';
     btn.innerHTML = '<img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="18" style="vertical-align:middle;margin-right:8px">以 Google 登入';
     btn.disabled = false;
   }
+});
+
+// 個人資料
+document.getElementById('studentProfileBtn').addEventListener('click', async () => {
+  document.getElementById('studentDropdown').classList.remove('open');
+  document.getElementById('studentProfileEmail').textContent = currentStudent.email || '';
+  // 讀取已儲存的暱稱
+  try {
+    const snap = await getDoc(doc(db, 'users', currentStudent.uid));
+    const nickname = snap.exists() ? (snap.data().nickname || '') : '';
+    document.getElementById('studentNicknameInput').value = nickname || currentStudent.displayName || '';
+  } catch(e) {
+    document.getElementById('studentNicknameInput').value = currentStudent.displayName || '';
+  }
+  document.getElementById('studentProfileOverlay').classList.add('open');
+});
+
+document.getElementById('studentProfileSave').addEventListener('click', async () => {
+  const nickname = document.getElementById('studentNicknameInput').value.trim();
+  if (!nickname) return;
+  await setDoc(doc(db, 'users', currentStudent.uid), { nickname, email: currentStudent.email }, { merge: true });
+  updateStudentBtn(nickname);
+  document.getElementById('studentProfileOverlay').classList.remove('open');
+});
+
+document.getElementById('studentProfileCancel').addEventListener('click', () => {
+  document.getElementById('studentProfileOverlay').classList.remove('open');
+});
+
+// 登出
+document.getElementById('studentLogoutBtn').addEventListener('click', () => {
+  document.getElementById('studentDropdown').classList.remove('open');
+  document.getElementById('studentLogoutName').textContent = currentStudent.displayName || '學生';
+  document.getElementById('studentLogoutOverlay').classList.add('open');
 });
 
 document.getElementById('studentLogoutCancel').addEventListener('click', () => {
@@ -1072,11 +1114,25 @@ document.getElementById('studentLogoutCancel').addEventListener('click', () => {
 document.getElementById('studentLogoutConfirm').addEventListener('click', async () => {
   await signOut(auth);
   document.getElementById('studentLogoutOverlay').classList.remove('open');
+  const notice = document.getElementById('studentLoggedOutNotice');
+  notice.style.display = 'block';
+  setTimeout(() => notice.style.display = 'none', 2000);
 });
 
-onAuthStateChanged(auth, user => {
+onAuthStateChanged(auth, async user => {
   currentStudent = user;
-  updateStudentBtn();
+  if (user) {
+    // 讀取暱稱
+    try {
+      const snap = await getDoc(doc(db, 'users', user.uid));
+      const nickname = snap.exists() ? snap.data().nickname : null;
+      updateStudentBtn(nickname);
+    } catch(e) {
+      updateStudentBtn();
+    }
+  } else {
+    updateStudentBtn();
+  }
 });
 
 
