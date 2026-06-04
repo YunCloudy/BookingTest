@@ -1,3 +1,37 @@
+// ══════════════════════════════════════════
+// FIRESTORE 資料結構
+// ══════════════════════════════════════════
+//
+// teachers/
+//   {teacherId}/
+//     info        → 老師基本資料
+//     settings/   → 公告、首頁區塊
+//     courses/    → 課程列表
+//     students/
+//       {userId}/
+//         name            → 學生姓名
+//         email           → 學生 email
+//         remainingCredits → 剩餘堂數
+//         orders/         → 訂單紀錄
+//           {orderId}/
+//             courses[]   → 報名的課程
+//             status      → pending / confirmed / cancelled
+//             amount      → 老師填的金額
+//             note        → 備註
+//
+// users/
+//   {userId}/
+//     profile     → 姓名、email
+//     bookings/   → 報名了哪些老師的哪些課
+//
+// ══════════════════════════════════════════
+//
+// ⚠️ TODO：目前 teacherId 寫死為測試值 'test_aerial'
+//    等 Google 登入完成後，改為動態讀取登入者的 uid
+//    const teacherId = auth.currentUser.uid;
+//
+// ══════════════════════════════════════════
+
 // ── FIREBASE ──
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
@@ -13,9 +47,20 @@ const firebaseConfig = {
 
 const firebaseApp = initializeApp(firebaseConfig);
 const db = getFirestore(firebaseApp);
+
+// ⚠️ 測試用 teacherId，待 Google 登入完成後改為 auth.currentUser.uid
+const teacherId = 'test_aerial';
+
 let isLoggedIn = false;
 
 // ── DATA ──
+
+// ══════════════════════════════════════════
+// 公告分三層：
+//   大公告 → 全站 banner，直接寫在 index.html #globalNoticeWrap
+//   中公告 → 按課程類別，存在 categories[].announceMid
+//   小公告 → 每堂課自己的備註，存在 courses[].announceSmall
+// ══════════════════════════════════════════
 
 // 大公告：放首頁 banner（在 index.html 直接寫）
 
@@ -49,7 +94,9 @@ const homeSections = {
   courseIntro: { id: 'sectionCourseIntro', icon: '🧘', title: '其他注意事項', text: '' },
 };
 
-// 小公告：每堂課自己的備註
+// 小公告：每堂課自己的備註（announceSmall）
+// → 顯示在課程 modal 的「課程備註」區塊
+// → 管理員可在課程卡的編輯區塊單獨儲存，不影響其他課程資料
 let courses = [
   {
     id: 1, cat: 'aerial', subcat: '常態團課',
@@ -188,10 +235,26 @@ let courses = [
   },
 ];
 
+// bookings：本地暫存各課程的報名名單
+// 格式：{ [courseId]: [{ name, phone, time }, ...] }
+// 初始化時以課程 id 為 key，預設空陣列
 const bookings = {};
 courses.forEach(c => bookings[c.id] = []);
 
 // ── FIRESTORE ──
+
+// ══════════════════════════════════════════
+// Firestore 文件路徑說明（目前暫存在 app/ collection）：
+//   app/bookings          → 所有課程報名名單（JSON 字串）
+//   app/courses_extra     → 課程異動（open、名額、備註等可編輯欄位）
+//   app/courses_added     → 新增課程（id > 15 的課程完整資料）
+//   app/categories_announce → 各類別中公告
+//   app/homeSections_text → 首頁各區塊文字
+//   app/globalNotice      → 首頁大公告（標題 + 內容）
+//
+// ⚠️ TODO：待 Google 登入完成後，路徑改為：
+//   teachers/{teacherId}/...（依上方 FIRESTORE 資料結構）
+// ══════════════════════════════════════════
 
 // 儲存所有資料到 Firestore
 async function saveToStorage() {
@@ -200,6 +263,8 @@ async function saveToStorage() {
     await setDoc(doc(db, 'app', 'bookings'), { data: JSON.stringify(bookings) });
 
     // 儲存課程修改與新增
+    // courses_extra：所有課程的可編輯欄位（包含原始 15 堂）
+    // courses_added：僅存 id > 15 的新增課程完整資料
     await setDoc(doc(db, 'app', 'courses_extra'), {
       data: JSON.stringify(courses.map(c => ({
         id: c.id, open: c.open, announceSmall: c.announceSmall,
@@ -236,6 +301,7 @@ async function saveToStorage() {
 async function loadFromStorage() {
   try {
     // 讀取 bookings
+    // 注意：Firestore 存 JSON 後，數字 key 會變成字串，需轉回 Number
     const bookingsSnap = await getDoc(doc(db, 'app', 'bookings'));
     if (bookingsSnap.exists()) {
       const parsed = JSON.parse(bookingsSnap.data().data);
@@ -326,6 +392,8 @@ document.querySelectorAll('.tab').forEach(tab => {
 });
 
 // ── HELPERS ──
+// isAdmin()：以按鈕文字判斷目前是否處於管理員模式
+// ⚠️ TODO：待 Google 登入完成後改為驗證 auth.currentUser.uid === teacherId
 function isAdmin() {
   return document.getElementById('adminBtn').textContent.includes('登出');
 }
@@ -337,6 +405,9 @@ function buildSpotsHtml(state, remaining, maxSpots) {
   return `<div class="spots-num">${remaining}</div><div class="spots-label">剩餘名額</div>`;
 }
 
+// 組合公告 HTML：
+//   mid   → 類別中公告（📢 課程公告），同類所有課程共用
+//   small → 課程小公告（📌 課程備註），每堂課獨立設定
 function buildAnnounceHtml(cat, course) {
   const mid = (cat && cat.announceMid)
     ? `<div class="modal-announce-mid"><div class="announce-title">📢 課程公告</div>${cat.announceMid}</div>` : '';
@@ -350,6 +421,11 @@ function catLabel(catId) {
 }
 
 // ── STATUS ──
+// 根據 open 旗標與報名人數，回傳課程狀態：
+//   closed  → 老師手動關閉報名
+//   full    → 報名人數已達 maxSpots
+//   pending → 報名人數未達開班門檻 minSpots（待開班）
+//   open    → 正常開放報名
 function courseStatus(c) {
   if (!c.open) return { state: 'closed', remaining: 0 };
   const booked   = (bookings[c.id] || []).length;
@@ -927,6 +1003,7 @@ document.getElementById('pwInput').addEventListener('keydown', e => {
   if (e.key === 'Enter') doLogin();
 });
 function doLogin() {
+  // ⚠️ 暫時密碼，待 Google 登入完成後移除此段
   const pw = document.getElementById('pwInput').value;
   if (pw === '1234') {
     document.getElementById('loginOverlay').classList.remove('open');
