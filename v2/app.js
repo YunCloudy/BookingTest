@@ -35,7 +35,7 @@
 // ── FIREBASE ──
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getAuth, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyB2pcS4xZViD7bhP8OpXK-tYAh851szUIE",
@@ -1058,7 +1058,8 @@ document.getElementById('googleLoginBtn').addEventListener('click', async () => 
   btn.disabled = true;
   document.getElementById('studentLoginError').textContent = '';
   try {
-    await signInWithPopup(auth, googleProvider);
+    import { signInWithRedirect, getRedirectResult } from "...firebase-auth.js"  
+    await signInWithRedirect(auth, googleProvider);
     document.getElementById('studentLoginOverlay').classList.remove('open');
   } catch (e) {
     document.getElementById('studentLoginError').textContent = '登入失敗，請再試一次';
@@ -1378,6 +1379,7 @@ function renderHomeSections() {
 
 // ── INIT初始化 ──
 (async () => {
+  const result = await getRedirectResult(auth);
   await loadFromStorage();
   renderCalendar();
   renderHomeSections();
