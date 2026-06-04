@@ -895,6 +895,13 @@ function bindModalRosterEvents(course) {
 
 // ── MODAL ──
 function openModal(course) {
+  // 未登入 → 跳學生登入
+  if (!isAdmin() && !currentStudent) {
+    document.getElementById('studentLoginError').textContent = '';
+    document.getElementById('studentLoginOverlay').classList.add('open');
+    return;
+  }
+
   currentCourse = course;
   const { state, remaining } = courseStatus(course);
   const isFull = state === 'full' || state === 'closed';
@@ -941,7 +948,17 @@ ${isAdmin() ? renderModalRoster(course) : (!isFull ? `
   if (isAdmin()) {
     bindModalRosterEvents(course);
   } else {
-    if (!isFull) document.getElementById('confirmBtn').addEventListener('click', handleBooking);
+    if (!isFull) {
+      // 自動帶入暱稱
+      if (currentStudent) {
+        getDoc(doc(db, 'users', currentStudent.uid)).then(snap => {
+          const nickname = snap.exists() ? (snap.data().nickname || '') : '';
+          const nameInput = document.getElementById('bookName');
+          if (nameInput) nameInput.value = nickname || currentStudent.displayName?.split(' ')[0] || '';
+        }).catch(() => {});
+      }
+      document.getElementById('confirmBtn').addEventListener('click', handleBooking);
+    }
   }
   document.getElementById('closeModalBtn').addEventListener('click', closeModal);
   document.getElementById('overlay').classList.add('open');
