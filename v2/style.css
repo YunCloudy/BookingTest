@@ -113,7 +113,31 @@ header .subtitle {
 .btn-google:hover { background: var(--latte-pale); }
 .btn-google:disabled { opacity: 0.6; cursor: default; }
 
-/* ── STUDENT DROPDOWN ── */
+/* ── TOAST ── */
+.toast-notice {
+  position: fixed;
+  top: 70px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-20px);
+  background: var(--ink);
+  color: white;
+  padding: 12px 24px;
+  border-radius: 24px;
+  font-size: 0.88rem;
+  font-family: 'Noto Sans TC', sans-serif;
+  z-index: 500;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s, transform 0.25s;
+  white-space: nowrap;
+  box-shadow: var(--shadow-lg);
+}
+.toast-notice.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+
 .student-dropdown {
   display: none;
   position: fixed;

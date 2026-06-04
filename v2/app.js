@@ -983,13 +983,21 @@ document.getElementById('overlay').addEventListener('click', e => {
   if (e.target === document.getElementById('overlay')) closeModal();
 });
 
+// ── TOAST ──
+function showToast(msg) {
+  const t = document.getElementById('toastNotice');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+
 // ── LOGIN ──
 document.getElementById('adminBtn').addEventListener('click', () => {
   if (document.getElementById('adminBtn').textContent.includes('登出')) {
     document.getElementById('adminBtn').textContent = '老師登入';
-    alert('已登出！');
     document.getElementById('adminPanel').classList.remove('open');
     if (currentView === 'calendar') renderCalendar(); else renderList();
+    showToast('已登出！');
     return;
   }
   document.getElementById('loginOverlay').classList.add('open');
@@ -1114,9 +1122,7 @@ document.getElementById('studentLogoutCancel').addEventListener('click', () => {
 document.getElementById('studentLogoutConfirm').addEventListener('click', async () => {
   await signOut(auth);
   document.getElementById('studentLogoutOverlay').classList.remove('open');
-  const notice = document.getElementById('studentLoggedOutNotice');
-  notice.style.display = 'block';
-  setTimeout(() => notice.style.display = 'none', 2000);
+  showToast('已登出！');
 });
 
 onAuthStateChanged(auth, async user => {
@@ -1432,7 +1438,13 @@ function renderHomeSections() {
 
 // ── INIT初始化 ──
 (async () => {
-  const redirectResult = await getRedirectResult(auth); if (redirectResult?.user) {   currentStudent = redirectResult.user;   updateStudentBtn(); }
+  try {
+    const redirectResult = await getRedirectResult(auth);
+    if (redirectResult?.user) {
+      currentStudent = redirectResult.user;
+      updateStudentBtn();
+    }
+  } catch(e) {}
   await loadFromStorage();
   renderCalendar();
   renderHomeSections();
