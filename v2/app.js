@@ -1145,6 +1145,7 @@ document.getElementById('studentLogoutConfirm').addEventListener('click', async 
 onAuthStateChanged(auth, async user => {
   currentStudent = user;
   if (user) {
+    showToast('auth: ' + user.email);
     // 讀取暱稱
     try {
       const snap = await getDoc(doc(db, 'users', user.uid));
