@@ -1460,8 +1460,13 @@ function renderHomeSections() {
     if (redirectResult?.user) {
       currentStudent = redirectResult.user;
       updateStudentBtn();
+      showToast('登入成功！');
+    } else {
+      showToast('no result');
     }
-  } catch(e) {}
+  } catch(e) {
+    showToast('err: ' + e.code);
+  }
   await loadFromStorage();
   renderCalendar();
   renderHomeSections();
