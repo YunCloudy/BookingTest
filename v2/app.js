@@ -1152,7 +1152,6 @@ document.getElementById('studentLogoutConfirm').addEventListener('click', async 
 onAuthStateChanged(auth, async user => {
   currentStudent = user;
   if (user) {
-    showToast('auth: ' + user.email);
     // 讀取暱稱
     try {
       const snap = await getDoc(doc(db, 'users', user.uid));
@@ -1470,11 +1469,9 @@ function renderHomeSections() {
       currentStudent = redirectResult.user;
       updateStudentBtn();
       showToast('登入成功！');
-    } else {
-      showToast('no result');
     }
   } catch(e) {
-    showToast('err: ' + e.code);
+    showToast('登入失敗：' + e.code);
   }
   await loadFromStorage();
   renderCalendar();
@@ -1482,7 +1479,6 @@ function renderHomeSections() {
   onAuthStateChanged(auth, async user => {
     currentStudent = user;
     if (user) {
-      showToast('auth: ' + user.email);
       try {
         const snap = await getDoc(doc(db, 'users', user.uid));
         const nickname = snap.exists() ? snap.data().nickname : null;
