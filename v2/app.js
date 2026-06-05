@@ -1160,6 +1160,7 @@ onAuthStateChanged(auth, async user => {
 });
 
 
+
 document.getElementById('closeAdmin').addEventListener('click', () => {
   document.getElementById('adminPanel').classList.remove('open');
   document.getElementById('adminBtn').textContent = '老師登入';
@@ -1471,4 +1472,19 @@ function renderHomeSections() {
   await loadFromStorage();
   renderCalendar();
   renderHomeSections();
+  onAuthStateChanged(auth, async user => {
+    currentStudent = user;
+    if (user) {
+      showToast('auth: ' + user.email);
+      try {
+        const snap = await getDoc(doc(db, 'users', user.uid));
+        const nickname = snap.exists() ? snap.data().nickname : null;
+        updateStudentBtn(nickname);
+      } catch(e) {
+        updateStudentBtn();
+      }
+    } else {
+      updateStudentBtn();
+    }
+  });
 })();
