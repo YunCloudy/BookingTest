@@ -1,3 +1,10 @@
+// 手機 debug 用，之後記得移除
+const logDiv = document.createElement('div');
+logDiv.style.cssText = 'position:fixed;bottom:0;left:0;right:0;height:200px;overflow:auto;background:rgba(0,0,0,0.8);color:lime;font-size:11px;padding:8px;z-index:99999;';
+document.body.appendChild(logDiv);
+const _log = console.log.bind(console);
+console.log = (...args) => { _log(...args); logDiv.innerHTML += args.join(' ') + '<br>'; logDiv.scrollTop = 99999; };
+console.error = (...args) => { _log(...args); logDiv.innerHTML += '❌ ' + args.join(' ') + '<br>'; logDiv.scrollTop = 99999; };
 // FIRESTORE 資料結構
 //
 // teachers/
