@@ -1082,6 +1082,7 @@ document.addEventListener('click', () => {
 // 登入
 document.getElementById('studentLoginCancel').addEventListener('click', () => {
   document.getElementById('studentLoginOverlay').classList.remove('open');
+  showToast('登入成功！');
 });
 
 document.getElementById('googleLoginBtn').addEventListener('click', async () => {
