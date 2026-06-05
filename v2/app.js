@@ -37,7 +37,7 @@ import { getAuth, signInWithPopup, signInWithRedirect, getRedirectResult, Google
 
 const firebaseConfig = {
   apiKey: "AIzaSyB2pcS4xZViD7bhP8OpXK-tYAh851szUIE",
-  authDomain: "yuncloudy.github.io",
+  authDomain: "bookingtest-aa55e.firebaseapp.com",
   projectId: "bookingtest-aa55e",
   storageBucket: "bookingtest-aa55e.firebasestorage.app",
   messagingSenderId: "828880797363",
@@ -1090,11 +1090,18 @@ document.getElementById('googleLoginBtn').addEventListener('click', async () => 
   btn.disabled = true;
   document.getElementById('studentLoginError').textContent = '';
   try {
-    await signInWithRedirect(auth, googleProvider);
+    const result = await signInWithPopup(auth, googleProvider);
+    if (result?.user) {
+      document.getElementById('studentLoginOverlay').classList.remove('open');
+    }
   } catch (e) {
-    document.getElementById('studentLoginError').textContent = '登入失敗，請再試一次';
-    btn.innerHTML = '<img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="18" style="vertical-align:middle;margin-right:8px">以 Google 登入';
-    btn.disabled = false;
+    if (e.code === 'auth/popup-blocked' || e.code === 'auth/popup-closed-by-user') {
+      await signInWithRedirect(auth, googleProvider);
+    } else {
+      document.getElementById('studentLoginError').textContent = '登入失敗：' + e.code;
+      btn.innerHTML = '<img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="18" style="vertical-align:middle;margin-right:8px">以 Google 登入';
+      btn.disabled = false;
+    }
   }
 });
 
