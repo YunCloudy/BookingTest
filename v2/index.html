@@ -68,8 +68,8 @@
       <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="18" style="vertical-align:middle;margin-right:8px">
       以 Google 登入
     </button>
+    <p>請登入以使用後台</p>
     <div class="login-error" id="loginError"></div>
-    <br>
     <button class="login-cancel" id="loginCancel">取消</button>
   </div>
 </div>
@@ -84,8 +84,8 @@
       <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="18" style="vertical-align:middle;margin-right:8px">
       以 Google 登入
     </button>
+    <p>請登入以送出訂單</p>
     <div class="login-error" id="studentLoginError"></div>
-    <br>
     <button class="login-cancel" id="studentLoginCancel">取消</button>
   </div>
 </div>
@@ -162,7 +162,7 @@
 <!-- 登入成功畫面 -->
 <div id="loginSuccess">
   <div class="login-success-icon">✨</div>
-  <div class="login-success-title">歡迎回來！</div>
+  <div class="login-success-title" id="loginSuccessName">歡迎回來！</div>
   <div class="login-success-sub">正在進入管理後台…</div>
 </div>
 
