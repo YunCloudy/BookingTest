@@ -19,6 +19,7 @@
     <div class="header-btns">
       <button id="adminBtn">老師登入</button>
       <button id="studentBtn">學生登入</button>
+      <button id="cartBtn" class="cart-btn" style="display:none">🛒<span id="cartBadge" class="cart-badge">0</span></button>
     </div>
   </header>
 
@@ -68,8 +69,8 @@
       <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="18" style="vertical-align:middle;margin-right:8px">
       以 Google 登入
     </button>
+    <p>請登入以使用後台</p>
     <div class="login-error" id="loginError"></div>
-    <br>
     <button class="login-cancel" id="loginCancel">取消</button>
   </div>
 </div>
@@ -84,8 +85,8 @@
       <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="18" style="vertical-align:middle;margin-right:8px">
       以 Google 登入
     </button>
+    <p>請登入以送出訂單</p>
     <div class="login-error" id="studentLoginError"></div>
-    <br>
     <button class="login-cancel" id="studentLoginCancel">取消</button>
   </div>
 </div>
@@ -162,8 +163,31 @@
 <!-- 登入成功畫面 -->
 <div id="loginSuccess">
   <div class="login-success-icon">✨</div>
-  <div class="login-success-title">歡迎回來！</div>
+  <div class="login-success-title" id="loginSuccessName">歡迎回來！</div>
   <div class="login-success-sub">正在進入管理後台…</div>
+</div>
+
+
+<!-- CART OVERLAY -->
+<div class="login-overlay" id="cartOverlay">
+  <div class="login-box cart-box">
+    <div style="font-size:2rem;margin-bottom:4px">🛒</div>
+    <h3>購物車</h3>
+    <div id="cartItems"></div>
+    <div id="cartCheckoutForm" style="display:none">
+      <div class="cart-divider"></div>
+      <div class="cart-field-label">你的名稱</div>
+      <input type="text" id="cartName" placeholder="輸入姓名" maxlength="20">
+      <div class="cart-field-label">聯絡電話（選填）</div>
+      <input type="tel" id="cartPhone" placeholder="輸入電話" maxlength="15">
+      <button class="btn-primary" id="cartSubmitBtn" style="width:100%;margin-top:8px">送出訂單</button>
+    </div>
+    <div id="cartLoginPrompt" style="display:none">
+      <div class="cart-divider"></div>
+      <button class="btn-primary" id="cartLoginBtn" style="width:100%">登入以送出訂單</button>
+    </div>
+    <button class="login-cancel" id="cartCloseBtn">關閉</button>
+  </div>
 </div>
 
 <!-- Firebase CDN -->

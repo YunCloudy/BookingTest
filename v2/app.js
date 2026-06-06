@@ -32,7 +32,7 @@
 
 // ── FIREBASE ──
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot, collection, getDocs, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getAuth, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 const firebaseConfig = {
@@ -53,6 +53,10 @@ let teacherId = null;        // 動態從 admins/{uid}.teacherId 拿
 let teacherName = null;     // 從 admins/{uid}.name 拿
 let currentTeacher = null;  // Google 登入的老師（Firebase User）
 let currentStudent = null;  // Google 登入的學生
+
+// ── CART ──
+const TEACHER_ID_STATIC = 'test_aerial';
+let cart = []; // [{ courseId, title, date, time, price }]
 
 // ── DATA ──
 
@@ -922,10 +926,11 @@ function openModal(course) {
   </div>
 ` : ''}
 ${isAdmin() ? renderModalRoster(course) : (!isFull ? `
-    <div class="booking-form" id="bookingForm">
-      <input type="text" id="bookName" placeholder="你的姓名" maxlength="20">
-      <input type="tel" id="bookPhone" placeholder="聯絡電話（選填）" maxlength="15">
-      <button class="btn-primary" id="confirmBtn">確認報名</button>
+    <div id="cartBtnArea">
+      ${cartHasItem(course.id)
+        ? '<div class="cart-added-label">✓ 已加入購物車</div><button class="btn-cart btn-cart-added" disabled>已在購物車中</button>'
+        : '<button class="btn-cart" id="addToCartBtn">🛒 加入購物車</button>'
+      }
     </div>` : `
     <div class="full-notice">本班已額滿，如有需要請向老師詢問候補 🙏</div>
     `)}
@@ -935,49 +940,148 @@ ${isAdmin() ? renderModalRoster(course) : (!isFull ? `
   if (isAdmin()) {
     bindModalRosterEvents(course);
   } else {
-    if (!isFull) {
-      // 自動帶入暱稱
-      if (currentStudent) {
-        getDoc(doc(db, 'users', currentStudent.uid)).then(snap => {
-          const nickname = snap.exists() ? (snap.data().nickname || '') : '';
-          const nameInput = document.getElementById('bookName');
-          if (nameInput) nameInput.value = nickname || currentStudent.displayName?.split(' ')[0] || '';
-        }).catch(() => {});
-      }
-      document.getElementById('confirmBtn').addEventListener('click', handleBooking);
+    if (!isFull && !cartHasItem(course.id)) {
+      document.getElementById('addToCartBtn').addEventListener('click', () => {
+        addToCart(course);
+        const area = document.getElementById('cartBtnArea');
+        if (area) area.innerHTML = '<div class="cart-added-label">✓ 已加入購物車</div><button class="btn-cart btn-cart-added" disabled>已在購物車中</button>';
+      });
     }
   }
   document.getElementById('closeModalBtn').addEventListener('click', closeModal);
   document.getElementById('overlay').classList.add('open');
 }
 
-// ── BOOKING ──
-function handleBooking() {
-  const name = document.getElementById('bookName').value.trim();
-  if (!name) {
-    document.getElementById('bookName').style.borderColor = '#e74c3c';
-    document.getElementById('bookName').focus();
+// ── CART FUNCTIONS ──
+function cartHasItem(courseId) {
+  return cart.some(item => item.courseId === courseId);
+}
+
+function addToCart(course) {
+  if (cartHasItem(course.id)) return;
+  cart.push({ courseId: course.id, title: course.title, date: course.date, time: course.time, price: course.price });
+  updateCartBtn();
+  showToast(`已加入購物車：${course.title}`);
+}
+
+function removeFromCart(courseId) {
+  cart = cart.filter(item => item.courseId !== courseId);
+  updateCartBtn();
+  renderCartOverlay();
+}
+
+function updateCartBtn() {
+  const btn = document.getElementById('cartBtn');
+  const badge = document.getElementById('cartBadge');
+  if (!btn) return;
+  btn.style.display = cart.length > 0 ? '' : 'none';
+  if (badge) badge.textContent = cart.length;
+}
+
+function openCartOverlay() {
+  renderCartOverlay();
+  document.getElementById('cartOverlay').classList.add('open');
+}
+
+function renderCartOverlay() {
+  const itemsEl = document.getElementById('cartItems');
+  const checkoutForm = document.getElementById('cartCheckoutForm');
+  const loginPrompt = document.getElementById('cartLoginPrompt');
+  if (!itemsEl) return;
+
+  if (cart.length === 0) {
+    itemsEl.innerHTML = '<div class="cart-empty">購物車是空的</div>';
+    checkoutForm.style.display = 'none';
+    loginPrompt.style.display = 'none';
     return;
   }
-  const phone = document.getElementById('bookPhone').value.trim();
-  const now = new Date().toLocaleTimeString('zh-TW', {hour:'2-digit', minute:'2-digit'});
-  bookings[currentCourse.id].push({ name, phone, time: now });
-  saveToStorage();
 
-  document.getElementById('modalContent').innerHTML = `
-    <div class="success-box">
-      <div class="success-icon">💮</div>
-      <h3>報名成功！</h3>
-      <p>${currentCourse.date} ${currentCourse.time}<br>${currentCourse.title}<br><br>期待在課堂上見到你 ✨</p>
-      <button class="btn-primary btn-full-mt" id="closeAfterBook">完成</button>
+  itemsEl.innerHTML = cart.map(item => `
+    <div class="cart-item">
+      <div class="cart-item-info">
+        <div class="cart-item-title">${item.title}</div>
+        <div class="cart-item-meta">📅 ${item.date} ${item.time}</div>
+      </div>
+      <button class="cart-item-remove" data-id="${item.courseId}">✕</button>
     </div>
-  `;
-  document.getElementById('closeAfterBook').addEventListener('click', () => {
-    closeModal();
-    if (currentView === 'calendar') renderCalendar();
-    else renderList();
+  `).join('');
+
+  itemsEl.querySelectorAll('.cart-item-remove').forEach(btn => {
+    btn.addEventListener('click', () => removeFromCart(+btn.dataset.id));
   });
+
+  if (currentStudent) {
+    checkoutForm.style.display = 'block';
+    loginPrompt.style.display = 'none';
+    getDoc(doc(db, 'users', currentStudent.uid)).then(snap => {
+      const nickname = snap.exists() ? (snap.data().nickname || '') : '';
+      const nameInput = document.getElementById('cartName');
+      if (nameInput && !nameInput.value) {
+        nameInput.value = nickname || currentStudent.displayName?.split(' ')[0] || '';
+      }
+    }).catch(() => {});
+  } else {
+    checkoutForm.style.display = 'none';
+    loginPrompt.style.display = 'block';
+  }
 }
+
+async function submitOrder() {
+  const name = document.getElementById('cartName').value.trim();
+  if (!name) {
+    document.getElementById('cartName').style.borderColor = '#e74c3c';
+    document.getElementById('cartName').focus();
+    return;
+  }
+  const phone = document.getElementById('cartPhone').value.trim();
+  const btn = document.getElementById('cartSubmitBtn');
+  btn.textContent = '送出中…';
+  btn.disabled = true;
+
+  const tid = teacherId || TEACHER_ID_STATIC;
+  const orderId = 'order_' + Date.now();
+  const orderData = {
+    studentId: currentStudent.uid,
+    studentName: name,
+    studentEmail: currentStudent.email || '',
+    phone,
+    courses: cart.map(item => ({
+      courseId: item.courseId,
+      title: item.title,
+      date: item.date,
+      time: item.time,
+      price: item.price,
+      result: 'pending'
+    })),
+    status: 'pending',
+    createdAt: new Date().toISOString(),
+    note: '',
+    amount: null
+  };
+
+  try {
+    await setDoc(doc(db, 'teachers', tid, 'orders', orderId), orderData);
+    cart = [];
+    updateCartBtn();
+    document.getElementById('cartOverlay').classList.remove('open');
+    showToast('訂單已送出！等待老師審核 ✨');
+  } catch(e) {
+    showToast('送出失敗，請再試一次');
+    btn.textContent = '送出訂單';
+    btn.disabled = false;
+  }
+}
+
+document.getElementById('cartBtn').addEventListener('click', openCartOverlay);
+document.getElementById('cartCloseBtn').addEventListener('click', () => {
+  document.getElementById('cartOverlay').classList.remove('open');
+});
+document.getElementById('cartSubmitBtn').addEventListener('click', submitOrder);
+document.getElementById('cartLoginBtn').addEventListener('click', () => {
+  document.getElementById('cartOverlay').classList.remove('open');
+  document.getElementById('studentLoginError').textContent = '';
+  document.getElementById('studentLoginOverlay').classList.add('open');
+});
 
 function closeModal() {
   document.getElementById('overlay').classList.remove('open');
@@ -1072,10 +1176,14 @@ document.getElementById('teacherGoogleLoginBtn').addEventListener('click', async
     currentTeacher = user;
     teacherId = adminSnap.data().teacherId;
     teacherName = adminSnap.data().name || null;
+    btn.innerHTML = '<img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="18" style="vertical-align:middle;margin-right:8px">以 Google 登入';
+    btn.disabled = false;
     document.getElementById('loginOverlay').classList.remove('open');
     updateTeacherBtn();
     await loadFromStorage();
     const splash = document.getElementById('loginSuccess');
+    const nameEl = document.getElementById('loginSuccessName');
+    if (nameEl) nameEl.textContent = `${teacherName || '老師'}，歡迎回來！`;
     splash.style.display = 'flex';
     setTimeout(() => {
       splash.style.display = 'none';
@@ -1164,6 +1272,7 @@ document.getElementById('googleLoginBtn').addEventListener('click', async () => 
         updateStudentBtn();
       }
       showToast('登入成功！');
+      if (cart.length > 0) setTimeout(() => openCartOverlay(), 300);
     }
   } catch (e) {
     if (e.code === 'auth/popup-blocked' || e.code === 'auth/popup-closed-by-user') {
@@ -1563,6 +1672,8 @@ function renderHomeSections() {
       updateTeacherBtn();
       await loadFromStorage();
       renderCalendar();
+      const nameEl2 = document.getElementById('loginSuccessName');
+      if (nameEl2) nameEl2.textContent = `${teacherName || '老師'}，歡迎回來！`;
       showToast('老師登入成功！');
       openAdmin();
     } else {
