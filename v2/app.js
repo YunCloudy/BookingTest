@@ -1367,6 +1367,7 @@ function renderAdmin() {
   tabBar.innerHTML = `
     <button class="admin-tab active" data-tab="home">首頁管理</button>
     <button class="admin-tab" data-tab="course">課程管理</button>
+    <button class="admin-tab" data-tab="orders">訂單管理</button>
   `;
   body.appendChild(tabBar);
 
@@ -1377,19 +1378,28 @@ function renderAdmin() {
   courseSection.id = 'adminCourseSection';
   courseSection.style.display = 'none';
 
+  const orderSection = document.createElement('div');
+  orderSection.id = 'adminOrderSection';
+  orderSection.style.display = 'none';
+
   body.appendChild(homeSection);
   body.appendChild(courseSection);
+  body.appendChild(orderSection);
 
   tabBar.querySelectorAll('.admin-tab').forEach(btn => {
     btn.addEventListener('click', () => {
       tabBar.querySelectorAll('.admin-tab').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
+      homeSection.style.display = 'none';
+      courseSection.style.display = 'none';
+      orderSection.style.display = 'none';
       if (btn.dataset.tab === 'home') {
         homeSection.style.display = 'block';
-        courseSection.style.display = 'none';
-      } else {
-        homeSection.style.display = 'none';
+      } else if (btn.dataset.tab === 'course') {
         courseSection.style.display = 'block';
+      } else if (btn.dataset.tab === 'orders') {
+        orderSection.style.display = 'block';
+        renderOrderSection();
       }
     });
   });
@@ -1623,6 +1633,165 @@ function renderAdmin() {
       alert(`「${titleVal}」已新增！`);
       renderCourseSection();
     });
+  }
+
+  // ── 訂單管理 ──
+  async function renderOrderSection() {
+    orderSection.innerHTML = '<div class="admin-section-title">訂單管理</div><div style="padding:16px;color:#aaa;font-size:0.85rem">載入中…</div>';
+
+    const tid = teacherId || TEACHER_ID_STATIC;
+    let orders = [];
+    try {
+      const snap = await getDocs(collection(db, 'teachers', tid, 'orders'));
+      snap.forEach(d => orders.push({ id: d.id, ...d.data() }));
+    } catch(e) {
+      orderSection.innerHTML = '<div style="padding:16px;color:#e74c3c">讀取失敗，請重試</div>';
+      return;
+    }
+
+    orders.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+
+    orderSection.innerHTML = '';
+
+    const title = document.createElement('div');
+    title.className = 'admin-section-title';
+    title.textContent = '訂單管理';
+    orderSection.appendChild(title);
+
+    if (orders.length === 0) {
+      const empty = document.createElement('div');
+      empty.style.cssText = 'padding:24px;text-align:center;color:#aaa;font-size:0.88rem';
+      empty.textContent = '目前還沒有訂單';
+      orderSection.appendChild(empty);
+      return;
+    }
+
+    const filterBar = document.createElement('div');
+    filterBar.className = 'admin-tab-bar';
+    filterBar.style.marginBottom = '12px';
+    filterBar.innerHTML = `
+      <button class="admin-tab active" data-filter="pending">待處理 (${orders.filter(o=>o.status==='pending').length})</button>
+      <button class="admin-tab" data-filter="confirmed">已確認 (${orders.filter(o=>o.status==='confirmed').length})</button>
+      <button class="admin-tab" data-filter="cancelled">已取消 (${orders.filter(o=>o.status==='cancelled').length})</button>
+    `;
+    orderSection.appendChild(filterBar);
+
+    const listWrap = document.createElement('div');
+    orderSection.appendChild(listWrap);
+
+    function renderFilteredOrders(filter) {
+      listWrap.innerHTML = '';
+      const filtered = orders.filter(o => o.status === filter);
+      if (filtered.length === 0) {
+        listWrap.innerHTML = `<div style="padding:24px;text-align:center;color:#aaa;font-size:0.88rem">沒有${filter === 'pending' ? '待處理' : filter === 'confirmed' ? '已確認' : '已取消'}的訂單</div>`;
+        return;
+      }
+
+      filtered.forEach(order => {
+        const card = document.createElement('div');
+        card.className = 'admin-card';
+        card.style.marginBottom = '12px';
+
+        const dateStr = order.createdAt
+          ? new Date(order.createdAt).toLocaleString('zh-TW', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' })
+          : '';
+
+        const coursesHtml = (order.courses || []).map(c => `
+          <div class="order-course-item">
+            <div class="order-course-left">
+              <span class="order-course-title">${c.title}</span>
+              <span class="order-course-meta">📅 ${c.date} ${c.time}</span>
+            </div>
+            <span class="order-course-price">$${c.price}</span>
+          </div>
+        `).join('');
+
+        const actionHtml = order.status === 'pending' ? `
+          <div class="order-actions">
+            <button class="order-btn-confirm" data-id="${order.id}">✓ 確認報名</button>
+            <button class="order-btn-cancel" data-id="${order.id}">✕ 取消</button>
+          </div>
+        ` : `<div class="order-status-tag ${order.status === 'confirmed' ? 'tag-confirmed' : 'tag-cancelled'}">${order.status === 'confirmed' ? '✓ 已確認' : '✕ 已取消'}</div>`;
+
+        card.innerHTML = `
+          <div class="order-header">
+            <div class="order-student-name">${order.studentName || '未知學生'}</div>
+            <div class="order-date">${dateStr}</div>
+          </div>
+          ${order.studentEmail ? `<div class="order-email">${order.studentEmail}</div>` : ''}
+          ${order.phone ? `<div class="order-phone">📞 ${order.phone}</div>` : ''}
+          <div class="order-courses">${coursesHtml}</div>
+          ${order.note ? `<div class="order-note">備註：${order.note}</div>` : ''}
+          ${actionHtml}
+        `;
+        listWrap.appendChild(card);
+      });
+
+      // 確認訂單
+      listWrap.querySelectorAll('.order-btn-confirm').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const orderId = btn.dataset.id;
+          const order = orders.find(o => o.id === orderId);
+          if (!order) return;
+          btn.textContent = '處理中…';
+          btn.disabled = true;
+          try {
+            const tid = teacherId || TEACHER_ID_STATIC;
+            await updateDoc(doc(db, 'teachers', tid, 'orders', orderId), { status: 'confirmed' });
+            for (const c of order.courses) {
+              const list = bookings[c.courseId] || [];
+              const already = list.some(b => b.name === order.studentName);
+              if (!already) {
+                const now = new Date().toLocaleString('zh-TW', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' });
+                list.push({ name: order.studentName, phone: order.phone || '', time: now });
+                bookings[c.courseId] = list;
+              }
+            }
+            await saveToStorage();
+            order.status = 'confirmed';
+            if (currentView === 'calendar') renderCalendar(); else renderList();
+            showToast(`已確認 ${order.studentName} 的訂單 ✨`);
+            renderOrderSection();
+          } catch(e) {
+            showToast('操作失敗，請再試一次');
+            btn.textContent = '✓ 確認報名';
+            btn.disabled = false;
+          }
+        });
+      });
+
+      // 取消訂單
+      listWrap.querySelectorAll('.order-btn-cancel').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          if (!confirm('確定要取消這筆訂單嗎？')) return;
+          const orderId = btn.dataset.id;
+          btn.textContent = '處理中…';
+          btn.disabled = true;
+          try {
+            const tid = teacherId || TEACHER_ID_STATIC;
+            await updateDoc(doc(db, 'teachers', tid, 'orders', orderId), { status: 'cancelled' });
+            const order = orders.find(o => o.id === orderId);
+            if (order) order.status = 'cancelled';
+            showToast('訂單已取消');
+            renderOrderSection();
+          } catch(e) {
+            showToast('操作失敗，請再試一次');
+            btn.textContent = '✕ 取消';
+            btn.disabled = false;
+          }
+        });
+      });
+    }
+
+    filterBar.querySelectorAll('.admin-tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        filterBar.querySelectorAll('.admin-tab').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        renderFilteredOrders(btn.dataset.filter);
+      });
+    });
+
+    renderFilteredOrders('pending');
   }
 
   renderHomeSection();
