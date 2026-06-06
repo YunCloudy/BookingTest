@@ -1,3 +1,4 @@
+console.log('VERSION 16');
 // FIRESTORE 資料結構
 //
 // teachers/
