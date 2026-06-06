@@ -1343,12 +1343,12 @@ main { padding: 20px 16px 40px; max-width: 680px; margin: 0 auto; }
 }
 .order-contact {
   font-size: 0.78rem;
-  color: var(--rose);
+  color: #aaa;
   margin-bottom: 2px;
 }
 .order-email, .order-phone {
   font-size: 0.78rem;
-  color: var(--rose);
+  color: #aaa;
   margin-bottom: 2px;
 }
 .order-courses {
@@ -1381,6 +1381,12 @@ main { padding: 20px 16px 40px; max-width: 680px; margin: 0 auto; }
   font-size: 0.88rem;
   font-weight: 600;
   color: var(--brown-dark);
+}
+.order-course-spots {
+  font-size: 0.75rem;
+  color: #aaa;
+  font-weight: 400;
+  margin-left: 5px;
 }
 .order-course-meta {
   font-size: 0.75rem;
@@ -1449,10 +1455,10 @@ main { padding: 20px 16px 40px; max-width: 680px; margin: 0 auto; }
 .order-btn-confirm {
   flex: 1;
   padding: 9px;
-  border: none;
+  border: 1.5px solid #d8d0cc;
   border-radius: 8px;
-  background: #d8d0cc;
-  color: #5a4e4a;
+  background: white;
+  color: #aaa;
   font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
@@ -1465,10 +1471,10 @@ main { padding: 20px 16px 40px; max-width: 680px; margin: 0 auto; }
 .order-btn-cancel {
   flex: 1;
   padding: 9px;
-  border: none;
+  border: 1.5px solid #d8d0cc;
   border-radius: 8px;
-  background: #d8d0cc;
-  color: #5a4e4a;
+  background: white;
+  color: #aaa;
   font-size: 0.85rem;
   cursor: pointer;
   font-family: inherit;

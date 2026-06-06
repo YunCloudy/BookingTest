@@ -965,10 +965,8 @@ function removeFromCart(courseId) {
 
 function updateCartBtn() {
   const btn = document.getElementById('cartBtn');
-  const badge = document.getElementById('cartBadge');
   if (!btn) return;
   btn.style.display = '';
-  if (badge) badge.textContent = cart.length > 0 ? cart.length : '';
 }
 
 function openCartOverlay() {
@@ -1716,8 +1714,8 @@ function renderAdmin() {
         const coursesHtml = coursesWithStatus.map((c, idx) => `
           <div class="order-course-item" data-course-idx="${idx}">
             <div class="order-course-left">
-              <span class="order-course-title">${c.title}${c.isOver ? ` <span class="order-overbook-tag">超收</span>` : ''}</span>
-              <span class="order-course-meta">📅 ${c.date} ${c.time}${c.maxSpots !== null ? `　名額 ${c.booked}/${c.maxSpots}` : ''}</span>
+              <span class="order-course-title">${c.title}${c.isOver ? ` <span class="order-overbook-tag">超收</span>` : ''}${c.maxSpots !== null ? `<span class="order-course-spots">名額 ${c.booked}/${c.maxSpots}</span>` : ''}</span>
+              <span class="order-course-meta">📅 ${c.date} ${c.time}</span>
             </div>
             <div class="order-course-right">
               <span class="order-course-price">$${c.price}</span>
@@ -1778,9 +1776,17 @@ function renderAdmin() {
               bookings[c.courseId] = list;
             }
             await saveToStorage();
+            // 全部課程都處理完 → 自動更新整筆訂單狀態
+            const allDone = order.courses.every(x => x.result === 'confirmed' || x.result === 'cancelled');
+            if (allDone) {
+              const allConfirmed = order.courses.every(x => x.result === 'confirmed');
+              const newStatus = allConfirmed ? 'confirmed' : 'cancelled';
+              await updateDoc(doc(db, 'teachers', tid, 'orders', orderId), { status: newStatus });
+              order.status = newStatus;
+            }
             if (currentView === 'calendar') renderCalendar(); else renderList();
             showToast(`已確認：${c.title} ✨`);
-            renderFilteredOrders(filter);
+            renderOrderSection();
           } catch(e) {
             showToast('操作失敗，請再試一次');
             btn.textContent = '✓'; btn.disabled = false;
@@ -1868,8 +1874,16 @@ function renderAdmin() {
               order.courses[idx].result = 'cancelled';
               order.courses[idx].cancelReason = reason;
               await updateDoc(doc(db, 'teachers', tid, 'orders', orderId), { courses: order.courses });
+              // 全部課程都處理完 → 自動更新整筆訂單狀態
+              const allDone = order.courses.every(x => x.result === 'confirmed' || x.result === 'cancelled');
+              if (allDone) {
+                const allConfirmed = order.courses.every(x => x.result === 'confirmed');
+                const newStatus = allConfirmed ? 'confirmed' : 'cancelled';
+                await updateDoc(doc(db, 'teachers', tid, 'orders', orderId), { status: newStatus });
+                order.status = newStatus;
+              }
               showToast(`已取消：${order.courses[idx].title}（${reason}）`);
-              renderFilteredOrders(filter);
+              renderOrderSection();
             }
           } catch(e) {
             showToast('操作失敗，請再試一次');
