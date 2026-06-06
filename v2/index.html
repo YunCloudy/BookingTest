@@ -63,10 +63,12 @@
   <div class="login-box">
     <div style="font-size:2rem;margin-bottom:8px">💮</div>
     <h3>老師登入</h3>
-    <p>請輸入管理密碼</p>
-    <input type="password" id="pwInput" placeholder="••••" maxlength="20">
+    <p>使用 Google 帳號登入</p>
+    <button class="btn-google" id="teacherGoogleLoginBtn">
+      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="18" style="vertical-align:middle;margin-right:8px">
+      以 Google 登入
+    </button>
     <div class="login-error" id="loginError"></div>
-    <button class="btn-primary" id="loginConfirm" style="width:100%">登入</button>
     <br>
     <button class="login-cancel" id="loginCancel">取消</button>
   </div>

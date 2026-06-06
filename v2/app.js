@@ -49,11 +49,9 @@ const db = getFirestore(firebaseApp);
 const auth = getAuth(firebaseApp);
 const googleProvider = new GoogleAuthProvider();
 
-// ⚠️ 測試用 teacherId，待 Google 登入完成後改為 auth.currentUser.uid
-const teacherId = 'test_aerial';
-
-let isLoggedIn = false;
-let currentStudent = null; // Google 登入的學生
+let teacherId = null;        // 動態從 admins/{uid}.teacherId 拿
+let currentTeacher = null;  // Google 登入的老師（Firebase User）
+let currentStudent = null;  // Google 登入的學生
 
 // ── DATA ──
 
@@ -246,28 +244,26 @@ courses.forEach(c => bookings[c.id] = []);
 // ── FIRESTORE ──
 
 // ══════════════════════════════════════════
-// Firestore 文件路徑說明（目前暫存在 app/ collection）：
-//   app/bookings          → 所有課程報名名單（JSON 字串）
-//   app/courses_extra     → 課程異動（open、名額、備註等可編輯欄位）
-//   app/courses_added     → 新增課程（id > 15 的課程完整資料）
-//   app/categories_announce → 各類別中公告
-//   app/homeSections_text → 首頁各區塊文字
-//   app/globalNotice      → 首頁大公告（標題 + 內容）
-//
-// ⚠️ TODO：待 Google 登入完成後，路徑改為：
-//   teachers/{teacherId}/...（依上方 FIRESTORE 資料結構）
+// Firestore 文件路徑：
+//   teachers/{teacherId}/settings/bookings
+//   teachers/{teacherId}/settings/courses_extra
+//   teachers/{teacherId}/settings/courses_added
+//   teachers/{teacherId}/settings/categories_announce
+//   teachers/{teacherId}/settings/homeSections_text
+//   teachers/{teacherId}/settings/globalNotice
 // ══════════════════════════════════════════
+
+function teacherDoc(name) {
+  return doc(db, 'teachers', teacherId, 'settings', name);
+}
 
 // 儲存所有資料到 Firestore
 async function saveToStorage() {
+  if (!teacherId) return;
   try {
-    // 儲存 bookings
-    await setDoc(doc(db, 'app', 'bookings'), { data: JSON.stringify(bookings) });
+    await setDoc(teacherDoc('bookings'), { data: JSON.stringify(bookings) });
 
-    // 儲存課程修改與新增
-    // courses_extra：所有課程的可編輯欄位（包含原始 15 堂）
-    // courses_added：僅存 id > 15 的新增課程完整資料
-    await setDoc(doc(db, 'app', 'courses_extra'), {
+    await setDoc(teacherDoc('courses_extra'), {
       data: JSON.stringify(courses.map(c => ({
         id: c.id, open: c.open, announceSmall: c.announceSmall,
         showRoster: c.showRoster, minSpots: c.minSpots, maxSpots: c.maxSpots,
@@ -277,44 +273,37 @@ async function saveToStorage() {
       })))
     });
 
-    // 儲存新增課程（id > 15）
     const extraCourses = courses.filter(c => c.id > 15);
-    await setDoc(doc(db, 'app', 'courses_added'), {
+    await setDoc(teacherDoc('courses_added'), {
       data: JSON.stringify(extraCourses)
     });
 
-    // 儲存公告
-    await setDoc(doc(db, 'app', 'categories_announce'), {
+    await setDoc(teacherDoc('categories_announce'), {
       data: JSON.stringify(categories.map(c => ({ id: c.id, announceMid: c.announceMid })))
     });
 
-    await setDoc(doc(db, 'app', 'homeSections_text'), {
+    await setDoc(teacherDoc('homeSections_text'), {
       data: JSON.stringify(Object.fromEntries(Object.entries(homeSections).map(([k,v]) => [k, v.text])))
     });
 
     const globalTitle = document.getElementById('globalNoticeTitle')?.innerText.trim() || '';
     const globalBody  = document.getElementById('globalNoticeBody')?.innerText.trim() || '';
-    await setDoc(doc(db, 'app', 'globalNotice'), { title: globalTitle, body: globalBody });
+    await setDoc(teacherDoc('globalNotice'), { title: globalTitle, body: globalBody });
 
   } catch(e) { console.warn('Firestore 儲存失敗', e); }
 }
 
-// 從 Firestore 讀取所有資料，完成後執行 callback
+// 從 Firestore 讀取所有資料
 async function loadFromStorage() {
+  if (!teacherId) return;
   try {
-    // 讀取 bookings
-    // 注意：Firestore 存 JSON 後，數字 key 會變成字串，需轉回 Number
-    const bookingsSnap = await getDoc(doc(db, 'app', 'bookings'));
+    const bookingsSnap = await getDoc(teacherDoc('bookings'));
     if (bookingsSnap.exists()) {
       const parsed = JSON.parse(bookingsSnap.data().data);
-      // 把 key 轉回數字（Firestore JSON 會把數字 key 存成字串）
-      Object.keys(parsed).forEach(k => {
-        bookings[+k] = parsed[k];
-      });
+      Object.keys(parsed).forEach(k => { bookings[+k] = parsed[k]; });
     }
 
-    // 讀取課程異動
-    const extraSnap = await getDoc(doc(db, 'app', 'courses_extra'));
+    const extraSnap = await getDoc(teacherDoc('courses_extra'));
     if (extraSnap.exists()) {
       const parsed = JSON.parse(extraSnap.data().data);
       parsed.forEach(saved => {
@@ -323,8 +312,7 @@ async function loadFromStorage() {
       });
     }
 
-    // 讀取新增課程
-    const addedSnap = await getDoc(doc(db, 'app', 'courses_added'));
+    const addedSnap = await getDoc(teacherDoc('courses_added'));
     if (addedSnap.exists()) {
       const added = JSON.parse(addedSnap.data().data);
       added.forEach(nc => {
@@ -335,8 +323,7 @@ async function loadFromStorage() {
       });
     }
 
-    // 讀取公告
-    const annSnap = await getDoc(doc(db, 'app', 'categories_announce'));
+    const annSnap = await getDoc(teacherDoc('categories_announce'));
     if (annSnap.exists()) {
       JSON.parse(annSnap.data().data).forEach(saved => {
         const cat = categories.find(c => c.id === saved.id);
@@ -344,7 +331,7 @@ async function loadFromStorage() {
       });
     }
 
-    const secSnap = await getDoc(doc(db, 'app', 'homeSections_text'));
+    const secSnap = await getDoc(teacherDoc('homeSections_text'));
     if (secSnap.exists()) {
       const parsed = JSON.parse(secSnap.data().data);
       Object.entries(parsed).forEach(([k, v]) => {
@@ -352,8 +339,7 @@ async function loadFromStorage() {
       });
     }
 
-    // 讀取大公告
-    const noticeSnap = await getDoc(doc(db, 'app', 'globalNotice'));
+    const noticeSnap = await getDoc(teacherDoc('globalNotice'));
     if (noticeSnap.exists()) {
       const { title, body } = noticeSnap.data();
       const noticeTitleEl = document.getElementById('globalNoticeTitle');
@@ -394,10 +380,9 @@ document.querySelectorAll('.tab').forEach(tab => {
 });
 
 // ── HELPERS ──
-// isAdmin()：以按鈕文字判斷目前是否處於管理員模式
-// ⚠️ TODO：待 Google 登入完成後改為驗證 auth.currentUser.uid === teacherId
+// isAdmin()：驗證目前登入的 Google 帳號是否為授權老師
 function isAdmin() {
-  return document.getElementById('adminBtn').textContent.includes('登出');
+  return currentTeacher !== null && teacherId !== null;
 }
 
 function buildSpotsHtml(state, remaining, maxSpots) {
@@ -1008,34 +993,58 @@ function showToast(msg) {
   setTimeout(() => t.classList.remove('show'), 2200);
 }
 
-// ── LOGIN ──
-document.getElementById('adminBtn').addEventListener('click', () => {
-  if (document.getElementById('adminBtn').textContent.includes('登出')) {
-    document.getElementById('adminBtn').textContent = '老師登入';
+// ── TEACHER LOGIN ──
+function updateTeacherBtn() {
+  const btn = document.getElementById('adminBtn');
+  btn.textContent = currentTeacher ? '🔓 登出' : '老師登入';
+}
+
+document.getElementById('adminBtn').addEventListener('click', async () => {
+  if (currentTeacher) {
+    // 登出
+    currentTeacher = null;
+    teacherId = null;
+    updateTeacherBtn();
     document.getElementById('adminPanel').classList.remove('open');
+    await signOut(auth);
     if (currentView === 'calendar') renderCalendar(); else renderList();
     showToast('已登出！');
     return;
   }
-  document.getElementById('loginOverlay').classList.add('open');
-  document.getElementById('pwInput').value = '';
   document.getElementById('loginError').textContent = '';
-  setTimeout(() => document.getElementById('pwInput').focus(), 100);
+  document.getElementById('loginOverlay').classList.add('open');
 });
+
 document.getElementById('loginCancel').addEventListener('click', () => {
   document.getElementById('loginOverlay').classList.remove('open');
 });
-document.getElementById('loginConfirm').addEventListener('click', doLogin);
-document.getElementById('pwInput').addEventListener('keydown', e => {
-  if (e.key === 'Enter') doLogin();
-});
-function doLogin() {
-  // ⚠️ 暫時密碼，待 Google 登入完成後移除此段
-  const pw = document.getElementById('pwInput').value;
-  if (pw === '1234') {
+
+document.getElementById('teacherGoogleLoginBtn').addEventListener('click', async () => {
+  const btn = document.getElementById('teacherGoogleLoginBtn');
+  btn.textContent = '登入中…';
+  btn.disabled = true;
+  document.getElementById('loginError').textContent = '';
+  try {
+    const result = await signInWithPopup(auth, googleProvider);
+    const user = result?.user;
+    if (!user) throw new Error('no user');
+
+    // 查 admins/{uid} 確認是授權老師
+    const adminSnap = await getDoc(doc(db, 'admins', user.uid));
+    if (!adminSnap.exists()) {
+      await signOut(auth);
+      document.getElementById('loginError').textContent = '此帳號沒有老師權限';
+      btn.innerHTML = '<img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="18" style="vertical-align:middle;margin-right:8px">以 Google 登入';
+      btn.disabled = false;
+      return;
+    }
+
+    // 授權成功
+    currentTeacher = user;
+    teacherId = adminSnap.data().teacherId;
     document.getElementById('loginOverlay').classList.remove('open');
-    document.getElementById('adminBtn').textContent = '🔓 登出';
-    isLoggedIn = true;
+    updateTeacherBtn();
+    await loadFromStorage();
     const splash = document.getElementById('loginSuccess');
     splash.style.display = 'flex';
     setTimeout(() => {
@@ -1043,12 +1052,17 @@ function doLogin() {
       openAdmin();
       if (currentView === 'calendar') renderCalendar(); else renderList();
     }, 1500);
-  } else {
-    document.getElementById('loginError').textContent = '密碼錯誤，請再試一次';
-    document.getElementById('pwInput').value = '';
-    document.getElementById('pwInput').focus();
+
+  } catch(e) {
+    if (e.code === 'auth/popup-blocked' || e.code === 'auth/popup-closed-by-user') {
+      await signInWithRedirect(auth, googleProvider);
+    } else {
+      document.getElementById('loginError').textContent = '登入失敗：' + (e.code || e.message);
+      btn.innerHTML = '<img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="18" style="vertical-align:middle;margin-right:8px">以 Google 登入';
+      btn.disabled = false;
+    }
   }
-}
+});
 
 // ── STUDENT LOGIN ──
 function updateStudentBtn(nickname) {
@@ -1150,27 +1164,12 @@ document.getElementById('studentLogoutConfirm').addEventListener('click', async 
   showToast('已登出！');
 });
 
-onAuthStateChanged(auth, async user => {
-  currentStudent = user;
-  if (user) {
-    // 讀取暱稱
-    try {
-      const snap = await getDoc(doc(db, 'users', user.uid));
-      const nickname = snap.exists() ? snap.data().nickname : null;
-      updateStudentBtn(nickname);
-    } catch(e) {
-      updateStudentBtn();
-    }
-  } else {
-    updateStudentBtn();
-  }
-});
+// onAuthStateChanged 已在 init 區塊統一處理
 
 
 
 document.getElementById('closeAdmin').addEventListener('click', () => {
   document.getElementById('adminPanel').classList.remove('open');
-  document.getElementById('adminBtn').textContent = '老師登入';
   if (currentView === 'calendar') renderCalendar(); else renderList();
 });
 
@@ -1465,30 +1464,52 @@ function renderHomeSections() {
 // ── INIT初始化 ──
 (async () => {
   try {
+    // 處理 redirect 登入結果（老師或學生）
     const redirectResult = await getRedirectResult(auth);
     if (redirectResult?.user) {
-      currentStudent = redirectResult.user;
-      updateStudentBtn();
-      showToast('登入成功！');
+      const user = redirectResult.user;
+      // 判斷是老師還是學生：查 admins collection
+      const adminSnap = await getDoc(doc(db, 'admins', user.uid));
+      if (adminSnap.exists()) {
+        currentTeacher = user;
+        teacherId = adminSnap.data().teacherId;
+        updateTeacherBtn();
+        await loadFromStorage();
+        showToast('老師登入成功！');
+        openAdmin();
+      } else {
+        currentStudent = user;
+        updateStudentBtn();
+        showToast('登入成功！');
+      }
     }
   } catch(e) {
     showToast('登入失敗：' + e.code);
   }
-  await loadFromStorage();
-  renderCalendar();
-  renderHomeSections();
+
+  // 學生狀態監聽（老師登入不走這邊）
   onAuthStateChanged(auth, async user => {
+    if (!user) {
+      currentStudent = null;
+      updateStudentBtn();
+      return;
+    }
+    // 如果是老師就不當學生處理
+    try {
+      const adminSnap = await getDoc(doc(db, 'admins', user.uid));
+      if (adminSnap.exists()) return; // 老師，跳過
+    } catch(e) {}
     currentStudent = user;
-    if (user) {
-      try {
-        const snap = await getDoc(doc(db, 'users', user.uid));
-        const nickname = snap.exists() ? snap.data().nickname : null;
-        updateStudentBtn(nickname);
-      } catch(e) {
-        updateStudentBtn();
-      }
-    } else {
+    try {
+      const snap = await getDoc(doc(db, 'users', user.uid));
+      const nickname = snap.exists() ? snap.data().nickname : null;
+      updateStudentBtn(nickname);
+    } catch(e) {
       updateStudentBtn();
     }
   });
+
+  await loadFromStorage();
+  renderCalendar();
+  renderHomeSections();
 })();
