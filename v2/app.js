@@ -1177,27 +1177,24 @@ document.getElementById('loginCancel').addEventListener('click', () => {
   document.getElementById('loginOverlay').classList.remove('open');
 });
 
-document.getElementById('teacherGoogleLoginBtn').addEventListener('click', async () => {
+document.getElementById('teacherGoogleLoginBtn').addEventListener('click', () => {
   const btn = document.getElementById('teacherGoogleLoginBtn');
   btn.textContent = '登入中…';
   btn.disabled = true;
   document.getElementById('loginError').textContent = '';
-  try {
-    const result = await signInWithPopup(auth, googleProvider);
+
+  // 同步觸發 popup（不 await 任何東西，確保 user gesture 有效）
+  signInWithPopup(auth, googleProvider).then(async result => {
     const user = result?.user;
     if (!user) throw new Error('no user');
-
-    // 查 admins/{uid} 確認是授權老師
     const adminSnap = await getDoc(doc(db, 'admins', user.uid));
     if (!adminSnap.exists()) {
       await signOut(auth);
       document.getElementById('loginError').textContent = '此帳號沒有老師權限';
-      btn.innerHTML = '<img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="18" style="vertical-align:middle;margin-right:8px">以 Google 登入';
+      btn.innerHTML = GOOGLE_BTN_INNER;
       btn.disabled = false;
       return;
     }
-
-    // 授權成功：先把學生登出（互斥）
     if (currentStudent) {
       currentStudent = null;
       updateStudentBtn();
@@ -1206,7 +1203,7 @@ document.getElementById('teacherGoogleLoginBtn').addEventListener('click', async
     currentTeacher = user;
     teacherId = adminSnap.data().teacherId;
     teacherName = adminSnap.data().name || null;
-    btn.innerHTML = '<img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="18" style="vertical-align:middle;margin-right:8px">以 Google 登入';
+    btn.innerHTML = GOOGLE_BTN_INNER;
     btn.disabled = false;
     document.getElementById('loginOverlay').classList.remove('open');
     updateTeacherBtn();
@@ -1220,16 +1217,13 @@ document.getElementById('teacherGoogleLoginBtn').addEventListener('click', async
       openAdmin();
       if (currentView === 'calendar') renderCalendar(); else renderList();
     }, 1500);
-
-  } catch(e) {
-    if (e.code === 'auth/popup-blocked' || e.code === 'auth/popup-closed-by-user') {
-      // redirect 已停用
-    } else {
+  }).catch(e => {
+    if (e.code !== 'auth/popup-closed-by-user') {
       document.getElementById('loginError').textContent = '登入失敗：' + (e.code || e.message);
-      btn.innerHTML = '<img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="18" style="vertical-align:middle;margin-right:8px">以 Google 登入';
-      btn.disabled = false;
     }
-  }
+    btn.innerHTML = GOOGLE_BTN_INNER;
+    btn.disabled = false;
+  });
 });
 
 // ── STUDENT LOGIN ──
@@ -1266,45 +1260,42 @@ document.getElementById('studentLoginCancel').addEventListener('click', () => {
   document.getElementById('studentLoginOverlay').classList.remove('open');
 });
 
-document.getElementById('googleLoginBtn').addEventListener('click', async () => {
+document.getElementById('googleLoginBtn').addEventListener('click', () => {
   const btn = document.getElementById('googleLoginBtn');
   btn.textContent = '登入中…';
   btn.disabled = true;
   document.getElementById('studentLoginError').textContent = '';
-  try {
-    const result = await signInWithPopup(auth, googleProvider);
+
+  signInWithPopup(auth, googleProvider).then(async result => {
     const user = result?.user;
-    if (user) {
-      // 先把老師狀態清除（互斥）
-      if (currentTeacher) {
-        currentTeacher = null;
-        teacherId = null;
-        teacherName = null;
-        updateTeacherBtn();
-        document.getElementById('adminPanel').classList.remove('open');
-      }
-      currentStudent = user;
-      document.getElementById('studentLoginOverlay').classList.remove('open');
-      // 讀暱稱後更新按鈕
-      try {
-        const snap = await getDoc(doc(db, 'users', user.uid));
-        const nickname = snap.exists() ? snap.data().nickname : null;
-        updateStudentBtn(nickname);
-      } catch(e) {
-        updateStudentBtn();
-      }
-      showToast('登入成功！');
-      if (cart.length > 0) setTimeout(() => openCartOverlay(), 300);
+    if (!user) return;
+    if (currentTeacher) {
+      currentTeacher = null;
+      teacherId = null;
+      teacherName = null;
+      updateTeacherBtn();
+      document.getElementById('adminPanel').classList.remove('open');
     }
-  } catch (e) {
-    if (e.code === 'auth/popup-blocked' || e.code === 'auth/popup-closed-by-user') {
-      // redirect 已停用
-    } else {
+    currentStudent = user;
+    document.getElementById('studentLoginOverlay').classList.remove('open');
+    try {
+      const snap = await getDoc(doc(db, 'users', user.uid));
+      const nickname = snap.exists() ? snap.data().nickname : null;
+      updateStudentBtn(nickname);
+    } catch(e) {
+      updateStudentBtn();
+    }
+    btn.innerHTML = GOOGLE_BTN_INNER;
+    btn.disabled = false;
+    showToast('登入成功！');
+    if (cart.length > 0) setTimeout(() => openCartOverlay(), 300);
+  }).catch(e => {
+    if (e.code !== 'auth/popup-closed-by-user') {
       document.getElementById('studentLoginError').textContent = '登入失敗：' + e.code;
-      btn.innerHTML = '<img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="18" style="vertical-align:middle;margin-right:8px">以 Google 登入';
-      btn.disabled = false;
     }
-  }
+    btn.innerHTML = GOOGLE_BTN_INNER;
+    btn.disabled = false;
+  });
 });
 
 // 個人資料
