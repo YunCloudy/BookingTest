@@ -1752,7 +1752,7 @@ function renderAdmin() {
             <button class="order-btn-confirm" data-id="${order.id}">✓ 全部確認</button>
             <button class="order-btn-cancel" data-id="${order.id}">✕ 全部取消</button>
           </div>
-        ` : `<div class="order-status-tag ${order.status === 'confirmed' ? 'tag-confirmed' : 'tag-cancelled'}">${order.status === 'confirmed' ? '✓ 已確認' : '✕ 已取消'}</div>`;
+        ` : '';
 
         card.innerHTML = `
           <div class="order-header">
