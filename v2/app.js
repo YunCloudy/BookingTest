@@ -356,7 +356,8 @@ async function loadFromStorage() {
 let currentCat = 'all';
 let currentCourse = null;
 let currentView = 'calendar';
-let calYear = 2026, calMonth = 4;
+const _now = new Date();
+let calYear = _now.getFullYear(), calMonth = _now.getMonth();
 let selectedDay = null;
 
 // ── TABS ──
@@ -1463,29 +1464,10 @@ function renderHomeSections() {
 
 // ── INIT初始化 ──
 (async () => {
-  try {
-    // 處理 redirect 登入結果（老師或學生）
-    const redirectResult = await getRedirectResult(auth);
-    if (redirectResult?.user) {
-      const user = redirectResult.user;
-      // 判斷是老師還是學生：查 admins collection
-      const adminSnap = await getDoc(doc(db, 'admins', user.uid));
-      if (adminSnap.exists()) {
-        currentTeacher = user;
-        teacherId = adminSnap.data().teacherId;
-        updateTeacherBtn();
-        await loadFromStorage();
-        showToast('老師登入成功！');
-        openAdmin();
-      } else {
-        currentStudent = user;
-        updateStudentBtn();
-        showToast('登入成功！');
-      }
-    }
-  } catch(e) {
-    showToast('登入失敗：' + e.code);
-  }
+  // 先跑頁面初始化，不等 redirect 結果
+  await loadFromStorage();
+  renderCalendar();
+  renderHomeSections();
 
   // 學生狀態監聽（老師登入不走這邊）
   onAuthStateChanged(auth, async user => {
@@ -1509,7 +1491,26 @@ function renderHomeSections() {
     }
   });
 
-  await loadFromStorage();
-  renderCalendar();
-  renderHomeSections();
+  // redirect 登入結果獨立處理，不阻塞頁面
+  getRedirectResult(auth).then(async redirectResult => {
+    if (!redirectResult?.user) return;
+    const user = redirectResult.user;
+    // 判斷是老師還是學生：查 admins collection
+    const adminSnap = await getDoc(doc(db, 'admins', user.uid));
+    if (adminSnap.exists()) {
+      currentTeacher = user;
+      teacherId = adminSnap.data().teacherId;
+      updateTeacherBtn();
+      await loadFromStorage();
+      renderCalendar();
+      showToast('老師登入成功！');
+      openAdmin();
+    } else {
+      currentStudent = user;
+      updateStudentBtn();
+      showToast('登入成功！');
+    }
+  }).catch(e => {
+    if (e.code) showToast('登入失敗：' + e.code);
+  });
 })();
