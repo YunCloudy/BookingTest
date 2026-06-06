@@ -1072,14 +1072,10 @@ document.getElementById('teacherGoogleLoginBtn').addEventListener('click', async
     currentTeacher = user;
     teacherId = adminSnap.data().teacherId;
     teacherName = adminSnap.data().name || null;
-    btn.innerHTML = '<img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="18" style="vertical-align:middle;margin-right:8px">以 Google 登入';
-    btn.disabled = false;
     document.getElementById('loginOverlay').classList.remove('open');
     updateTeacherBtn();
     await loadFromStorage();
     const splash = document.getElementById('loginSuccess');
-    const nameEl = document.getElementById('loginSuccessName');
-    if (nameEl) nameEl.textContent = `${teacherName || '老師'}，歡迎回來！`;
     splash.style.display = 'flex';
     setTimeout(() => {
       splash.style.display = 'none';
@@ -1567,8 +1563,6 @@ function renderHomeSections() {
       updateTeacherBtn();
       await loadFromStorage();
       renderCalendar();
-      const nameEl2 = document.getElementById('loginSuccessName');
-      if (nameEl2) nameEl2.textContent = `${teacherName || '老師'}，歡迎回來！`;
       showToast('老師登入成功！');
       openAdmin();
     } else {
