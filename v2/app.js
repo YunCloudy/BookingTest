@@ -965,8 +965,22 @@ function removeFromCart(courseId) {
 
 function updateCartBtn() {
   const btn = document.getElementById('cartBtn');
+  const badge = document.getElementById('cartCount');
   if (!btn) return;
+  if (currentTeacher) {
+    btn.style.display = 'none';
+    return;
+  }
   btn.style.display = '';
+  if (badge) {
+    if (cart.length > 0) {
+      badge.textContent = cart.length;
+      badge.style.display = 'flex';
+    } else {
+      badge.textContent = '';
+      badge.style.display = 'none';
+    }
+  }
 }
 
 function openCartOverlay() {
@@ -1061,6 +1075,8 @@ async function submitOrder() {
     await setDoc(doc(db, 'teachers', tid, 'orders', orderId), orderData);
     cart = [];
     updateCartBtn();
+    btn.textContent = '送出訂單';
+    btn.disabled = false;
     document.getElementById('cartOverlay').classList.remove('open');
     showToast('訂單已送出！等待老師審核 ✨');
   } catch(e) {

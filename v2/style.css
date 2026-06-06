@@ -1455,32 +1455,36 @@ main { padding: 20px 16px 40px; max-width: 680px; margin: 0 auto; }
 .order-btn-confirm {
   flex: 1;
   padding: 9px;
-  border: 1.5px solid #d8d0cc;
+  border: none;
   border-radius: 8px;
-  background: white;
-  color: #aaa;
+  background: var(--rose-dark);
+  color: white;
   font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
   font-family: inherit;
+  transition: opacity 0.15s;
 }
+.order-btn-confirm:hover { opacity: 0.85; }
 .order-btn-confirm:disabled {
-  opacity: 0.6;
+  opacity: 0.5;
   cursor: default;
 }
 .order-btn-cancel {
   flex: 1;
   padding: 9px;
-  border: 1.5px solid #d8d0cc;
+  border: none;
   border-radius: 8px;
-  background: white;
-  color: #aaa;
+  background: var(--mocha);
+  color: var(--oat);
   font-size: 0.85rem;
   cursor: pointer;
   font-family: inherit;
+  transition: opacity 0.15s;
 }
+.order-btn-cancel:hover { opacity: 0.85; }
 .order-btn-cancel:disabled {
-  opacity: 0.6;
+  opacity: 0.5;
   cursor: default;
 }
 .order-cancel-reason-wrap {
