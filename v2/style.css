@@ -1308,7 +1308,7 @@ main { padding: 20px 16px 40px; max-width: 680px; margin: 0 auto; }
 .cart-empty { color: #bbb; padding: 20px 0; font-size: 0.9rem; }
 .cart-divider { border-top: 1px solid var(--cream); margin: 12px 0; }
 .cart-field-label { text-align: left; font-size: 0.82rem; color: #7a6560; margin-bottom: 4px; margin-top: 10px; }
-.cart-added-label { color: var(--rose); font-size: 0.85rem; margin-bottom: 6px; }
-.btn-cart { width: 100%; padding: 14px; background: var(--cream); color: var(--brown-dark); border: none; border-radius: var(--radius); font-size: 1rem; font-weight: 600; cursor: pointer; transition: background 0.2s; }
-.btn-cart:hover { background: #e8d5c4; }
-.btn-cart-added { background: #f0e8e0; color: #bbb; cursor: not-allowed; }
+.cart-added-label { color: var(--ink-soft); font-size: 0.85rem; margin-bottom: 6px; text-align: center; }
+.btn-cart { width: 100%; padding: 14px; background: var(--latte-pale); color: var(--brown-dark); border: none; border-radius: var(--radius); font-size: 1rem; font-weight: 600; cursor: pointer; transition: opacity 0.2s; text-align: center; }
+.btn-cart:hover { opacity: 0.8; }
+.btn-cart-added { opacity: 0.5; cursor: not-allowed; }

@@ -886,13 +886,6 @@ function bindModalRosterEvents(course) {
 
 // ── MODAL ──
 function openModal(course) {
-  // 未登入 → 跳學生登入
-  if (!isAdmin() && !currentStudent) {
-    document.getElementById('studentLoginError').textContent = '';
-    document.getElementById('studentLoginOverlay').classList.add('open');
-    return;
-  }
-
   currentCourse = course;
   const { state, remaining } = courseStatus(course);
   const isFull = state === 'full' || state === 'closed';
@@ -1027,6 +1020,13 @@ function renderCartOverlay() {
 }
 
 async function submitOrder() {
+  // 未登入 → 跳登入，登入後自動重開購物車
+  if (!currentStudent) {
+    document.getElementById('cartOverlay').classList.remove('open');
+    document.getElementById('studentLoginError').textContent = '';
+    document.getElementById('studentLoginOverlay').classList.add('open');
+    return;
+  }
   const name = document.getElementById('cartName').value.trim();
   if (!name) {
     document.getElementById('cartName').style.borderColor = '#e74c3c';
