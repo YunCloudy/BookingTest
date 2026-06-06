@@ -33,7 +33,7 @@
 // ── FIREBASE ──
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot, collection, getDocs, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-import { getAuth, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut, onAuthStateChanged, browserLocalPersistence, browserSessionPersistence, setPersistence } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyB2pcS4xZViD7bhP8OpXK-tYAh851szUIE",
@@ -1183,7 +1183,6 @@ document.getElementById('teacherGoogleLoginBtn').addEventListener('click', async
   btn.disabled = true;
   document.getElementById('loginError').textContent = '';
   try {
-    await setPersistence(auth, browserLocalPersistence);
     const result = await signInWithPopup(auth, googleProvider);
     const user = result?.user;
     if (!user) throw new Error('no user');
@@ -1224,7 +1223,7 @@ document.getElementById('teacherGoogleLoginBtn').addEventListener('click', async
 
   } catch(e) {
     if (e.code === 'auth/popup-blocked' || e.code === 'auth/popup-closed-by-user') {
-      await signInWithRedirect(auth, googleProvider);
+      // redirect 已停用
     } else {
       document.getElementById('loginError').textContent = '登入失敗：' + (e.code || e.message);
       btn.innerHTML = '<img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="18" style="vertical-align:middle;margin-right:8px">以 Google 登入';
@@ -1273,7 +1272,6 @@ document.getElementById('googleLoginBtn').addEventListener('click', async () => 
   btn.disabled = true;
   document.getElementById('studentLoginError').textContent = '';
   try {
-    await setPersistence(auth, browserSessionPersistence);
     const result = await signInWithPopup(auth, googleProvider);
     const user = result?.user;
     if (user) {
@@ -1300,7 +1298,7 @@ document.getElementById('googleLoginBtn').addEventListener('click', async () => 
     }
   } catch (e) {
     if (e.code === 'auth/popup-blocked' || e.code === 'auth/popup-closed-by-user') {
-      await signInWithRedirect(auth, googleProvider);
+      // redirect 已停用
     } else {
       document.getElementById('studentLoginError').textContent = '登入失敗：' + e.code;
       btn.innerHTML = '<img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="18" style="vertical-align:middle;margin-right:8px">以 Google 登入';
@@ -1981,29 +1979,4 @@ function renderHomeSections() {
     updateCartBtn();
   });
 
-  // redirect 登入結果獨立處理，不阻塞頁面
-  getRedirectResult(auth).then(async redirectResult => {
-    if (!redirectResult?.user) return;
-    const user = redirectResult.user;
-    // 判斷是老師還是學生：查 admins collection
-    const adminSnap = await getDoc(doc(db, 'admins', user.uid));
-    if (adminSnap.exists()) {
-      currentTeacher = user;
-      teacherId = adminSnap.data().teacherId;
-      teacherName = adminSnap.data().name || null;
-      updateTeacherBtn();
-      await loadFromStorage();
-      renderCalendar();
-      const nameEl2 = document.getElementById('loginSuccessName');
-      if (nameEl2) nameEl2.textContent = `${teacherName || '老師'}，歡迎回來！`;
-      showToast('老師登入成功！');
-      openAdmin();
-    } else {
-      currentStudent = user;
-      updateStudentBtn();
-      showToast('登入成功！');
-    }
-  }).catch(e => {
-    if (e.code) showToast('登入失敗：' + e.code);
-  });
 })();
