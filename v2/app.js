@@ -967,8 +967,8 @@ function updateCartBtn() {
   const btn = document.getElementById('cartBtn');
   const badge = document.getElementById('cartBadge');
   if (!btn) return;
-  btn.style.display = cart.length > 0 ? '' : 'none';
-  if (badge) badge.textContent = cart.length;
+  btn.style.display = '';
+  if (badge) badge.textContent = cart.length > 0 ? cart.length : '';
 }
 
 function openCartOverlay() {
@@ -1108,6 +1108,7 @@ function updateTeacherBtn() {
     if (cartBtn) cartBtn.style.display = 'none';
   } else if (!currentStudent) {
     loginBtn.textContent = '登入 ▾';
+    if (cartBtn) cartBtn.style.display = '';
   }
 }
 
@@ -1660,7 +1661,7 @@ function renderAdmin() {
 
     if (orders.length === 0) {
       const empty = document.createElement('div');
-      empty.style.cssText = 'padding:24px;text-align:center;color:#aaa;font-size:0.88rem';
+      empty.className = 'order-empty-hint';
       empty.textContent = '目前還沒有訂單';
       orderSection.appendChild(empty);
       return;
@@ -1679,11 +1680,16 @@ function renderAdmin() {
     const listWrap = document.createElement('div');
     orderSection.appendChild(listWrap);
 
+    const CANCEL_REASONS = ['已額滿', '時間衝突', '課程取消', '其他'];
+
     function renderFilteredOrders(filter) {
       listWrap.innerHTML = '';
       const filtered = orders.filter(o => o.status === filter);
       if (filtered.length === 0) {
-        listWrap.innerHTML = `<div style="padding:24px;text-align:center;color:#aaa;font-size:0.88rem">沒有${filter === 'pending' ? '待處理' : filter === 'confirmed' ? '已確認' : '已取消'}的訂單</div>`;
+        const hint = document.createElement('div');
+        hint.className = 'order-empty-hint';
+        hint.textContent = `沒有${filter === 'pending' ? '待處理' : filter === 'confirmed' ? '已確認' : '已取消'}的訂單`;
+        listWrap.appendChild(hint);
         return;
       }
 
@@ -1696,20 +1702,39 @@ function renderAdmin() {
           ? new Date(order.createdAt).toLocaleString('zh-TW', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' })
           : '';
 
-        const coursesHtml = (order.courses || []).map(c => `
-          <div class="order-course-item">
+        // 計算每堂課超收狀態
+        const coursesWithStatus = (order.courses || []).map(c => {
+          const booked = (bookings[c.courseId] || []).length;
+          const course = courses.find(x => x.id === c.courseId);
+          const maxSpots = course ? course.maxSpots : null;
+          const isOver = maxSpots !== null && booked >= maxSpots;
+          return { ...c, booked, maxSpots, isOver };
+        });
+
+        const isPending = order.status === 'pending';
+
+        const coursesHtml = coursesWithStatus.map((c, idx) => `
+          <div class="order-course-item" data-course-idx="${idx}">
             <div class="order-course-left">
-              <span class="order-course-title">${c.title}</span>
-              <span class="order-course-meta">📅 ${c.date} ${c.time}</span>
+              <span class="order-course-title">${c.title}${c.isOver ? ` <span class="order-overbook-tag">超收</span>` : ''}</span>
+              <span class="order-course-meta">📅 ${c.date} ${c.time}${c.maxSpots !== null ? `　名額 ${c.booked}/${c.maxSpots}` : ''}</span>
             </div>
-            <span class="order-course-price">$${c.price}</span>
+            <div class="order-course-right">
+              <span class="order-course-price">$${c.price}</span>
+              ${isPending ? `
+                <div class="order-course-actions">
+                  <button class="order-course-btn-confirm" data-order-id="${order.id}" data-course-idx="${idx}">✓</button>
+                  <button class="order-course-btn-cancel" data-order-id="${order.id}" data-course-idx="${idx}">✕</button>
+                </div>
+              ` : c.result === 'confirmed' ? '<span class="order-course-tag tag-confirmed">✓</span>' : c.result === 'cancelled' ? '<span class="order-course-tag tag-cancelled">✕</span>' : ''}
+            </div>
           </div>
         `).join('');
 
-        const actionHtml = order.status === 'pending' ? `
+        const bulkActionHtml = isPending ? `
           <div class="order-actions">
-            <button class="order-btn-confirm" data-id="${order.id}">✓ 確認報名</button>
-            <button class="order-btn-cancel" data-id="${order.id}">✕ 取消</button>
+            <button class="order-btn-confirm" data-id="${order.id}">✓ 全部確認</button>
+            <button class="order-btn-cancel" data-id="${order.id}">✕ 全部取消</button>
           </div>
         ` : `<div class="order-status-tag ${order.status === 'confirmed' ? 'tag-confirmed' : 'tag-cancelled'}">${order.status === 'confirmed' ? '✓ 已確認' : '✕ 已取消'}</div>`;
 
@@ -1718,30 +1743,79 @@ function renderAdmin() {
             <div class="order-student-name">${order.studentName || '未知學生'}</div>
             <div class="order-date">${dateStr}</div>
           </div>
-          ${order.studentEmail ? `<div class="order-email">${order.studentEmail}</div>` : ''}
+          <div class="order-contact">本行文字待定，預計填寫email/手機/line名稱</div>
           ${order.phone ? `<div class="order-phone">📞 ${order.phone}</div>` : ''}
           <div class="order-courses">${coursesHtml}</div>
           ${order.note ? `<div class="order-note">備註：${order.note}</div>` : ''}
-          ${actionHtml}
+          ${bulkActionHtml}
+          <div class="order-cancel-reason-wrap" style="display:none">
+            <div class="order-cancel-reason-label">取消原因</div>
+            <div class="order-cancel-reason-btns">
+              ${CANCEL_REASONS.map(r => `<button class="order-reason-btn" data-reason="${r}">${r}</button>`).join('')}
+            </div>
+          </div>
         `;
         listWrap.appendChild(card);
       });
 
-      // 確認訂單
+      // ── 單堂確認 ──
+      listWrap.querySelectorAll('.order-course-btn-confirm').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const orderId = btn.dataset.orderId;
+          const idx = parseInt(btn.dataset.courseIdx);
+          const order = orders.find(o => o.id === orderId);
+          if (!order) return;
+          btn.textContent = '…'; btn.disabled = true;
+          try {
+            const tid = teacherId || TEACHER_ID_STATIC;
+            order.courses[idx].result = 'confirmed';
+            await updateDoc(doc(db, 'teachers', tid, 'orders', orderId), { courses: order.courses });
+            const c = order.courses[idx];
+            const list = bookings[c.courseId] || [];
+            if (!list.some(b => b.name === order.studentName)) {
+              const now = new Date().toLocaleString('zh-TW', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' });
+              list.push({ name: order.studentName, phone: order.phone || '', time: now });
+              bookings[c.courseId] = list;
+            }
+            await saveToStorage();
+            if (currentView === 'calendar') renderCalendar(); else renderList();
+            showToast(`已確認：${c.title} ✨`);
+            renderFilteredOrders(filter);
+          } catch(e) {
+            showToast('操作失敗，請再試一次');
+            btn.textContent = '✓'; btn.disabled = false;
+          }
+        });
+      });
+
+      // ── 單堂取消（選理由）──
+      listWrap.querySelectorAll('.order-course-btn-cancel').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const orderId = btn.dataset.orderId;
+          const idx = parseInt(btn.dataset.courseIdx);
+          const card = btn.closest('.admin-card');
+          const reasonWrap = card.querySelector('.order-cancel-reason-wrap');
+          reasonWrap.style.display = 'block';
+          reasonWrap.dataset.orderId = orderId;
+          reasonWrap.dataset.courseIdx = idx;
+          reasonWrap.dataset.mode = 'single';
+        });
+      });
+
+      // ── 整筆確認 ──
       listWrap.querySelectorAll('.order-btn-confirm').forEach(btn => {
         btn.addEventListener('click', async () => {
           const orderId = btn.dataset.id;
           const order = orders.find(o => o.id === orderId);
           if (!order) return;
-          btn.textContent = '處理中…';
-          btn.disabled = true;
+          btn.textContent = '處理中…'; btn.disabled = true;
           try {
             const tid = teacherId || TEACHER_ID_STATIC;
-            await updateDoc(doc(db, 'teachers', tid, 'orders', orderId), { status: 'confirmed' });
+            order.courses = order.courses.map(c => ({ ...c, result: 'confirmed' }));
+            await updateDoc(doc(db, 'teachers', tid, 'orders', orderId), { status: 'confirmed', courses: order.courses });
             for (const c of order.courses) {
               const list = bookings[c.courseId] || [];
-              const already = list.some(b => b.name === order.studentName);
-              if (!already) {
+              if (!list.some(b => b.name === order.studentName)) {
                 const now = new Date().toLocaleString('zh-TW', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' });
                 list.push({ name: order.studentName, phone: order.phone || '', time: now });
                 bookings[c.courseId] = list;
@@ -1754,30 +1828,52 @@ function renderAdmin() {
             renderOrderSection();
           } catch(e) {
             showToast('操作失敗，請再試一次');
-            btn.textContent = '✓ 確認報名';
-            btn.disabled = false;
+            btn.textContent = '✓ 全部確認'; btn.disabled = false;
           }
         });
       });
 
-      // 取消訂單
+      // ── 整筆取消（選理由）──
       listWrap.querySelectorAll('.order-btn-cancel').forEach(btn => {
-        btn.addEventListener('click', async () => {
-          if (!confirm('確定要取消這筆訂單嗎？')) return;
+        btn.addEventListener('click', () => {
           const orderId = btn.dataset.id;
-          btn.textContent = '處理中…';
-          btn.disabled = true;
+          const card = btn.closest('.admin-card');
+          const reasonWrap = card.querySelector('.order-cancel-reason-wrap');
+          reasonWrap.style.display = 'block';
+          reasonWrap.dataset.orderId = orderId;
+          reasonWrap.dataset.mode = 'bulk';
+        });
+      });
+
+      // ── 理由按鈕 ──
+      listWrap.querySelectorAll('.order-reason-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const reasonWrap = btn.closest('.order-cancel-reason-wrap');
+          const orderId = reasonWrap.dataset.orderId;
+          const mode = reasonWrap.dataset.mode;
+          const reason = btn.dataset.reason;
+          const order = orders.find(o => o.id === orderId);
+          if (!order) return;
+          btn.textContent = '處理中…'; btn.disabled = true;
           try {
             const tid = teacherId || TEACHER_ID_STATIC;
-            await updateDoc(doc(db, 'teachers', tid, 'orders', orderId), { status: 'cancelled' });
-            const order = orders.find(o => o.id === orderId);
-            if (order) order.status = 'cancelled';
-            showToast('訂單已取消');
-            renderOrderSection();
+            if (mode === 'bulk') {
+              order.courses = order.courses.map(c => ({ ...c, result: 'cancelled', cancelReason: reason }));
+              await updateDoc(doc(db, 'teachers', tid, 'orders', orderId), { status: 'cancelled', cancelReason: reason, courses: order.courses });
+              order.status = 'cancelled';
+              showToast(`訂單已取消：${reason}`);
+              renderOrderSection();
+            } else {
+              const idx = parseInt(reasonWrap.dataset.courseIdx);
+              order.courses[idx].result = 'cancelled';
+              order.courses[idx].cancelReason = reason;
+              await updateDoc(doc(db, 'teachers', tid, 'orders', orderId), { courses: order.courses });
+              showToast(`已取消：${order.courses[idx].title}（${reason}）`);
+              renderFilteredOrders(filter);
+            }
           } catch(e) {
             showToast('操作失敗，請再試一次');
-            btn.textContent = '✕ 取消';
-            btn.disabled = false;
+            btn.textContent = reason; btn.disabled = false;
           }
         });
       });
