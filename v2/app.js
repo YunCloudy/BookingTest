@@ -1,4 +1,3 @@
-console.log('VERSION 16');
 // FIRESTORE 資料結構
 //
 // teachers/
@@ -1928,6 +1927,7 @@ function renderHomeSections() {
 // ── INIT初始化 ──
 (async () => {
   // 先跑頁面初始化，不等 redirect 結果
+  setTimeout(() => showToast('v16'), 1000);
   await loadFromStorage();
   renderCalendar();
   renderHomeSections();
