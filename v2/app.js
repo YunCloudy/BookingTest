@@ -50,6 +50,7 @@ const auth = getAuth(firebaseApp);
 const googleProvider = new GoogleAuthProvider();
 
 let teacherId = null;        // 動態從 admins/{uid}.teacherId 拿
+let teacherName = null;     // 從 admins/{uid}.name 拿
 let currentTeacher = null;  // Google 登入的老師（Firebase User）
 let currentStudent = null;  // Google 登入的學生
 
@@ -997,23 +998,35 @@ function showToast(msg) {
 // ── TEACHER LOGIN ──
 function updateTeacherBtn() {
   const btn = document.getElementById('adminBtn');
-  btn.textContent = currentTeacher ? '🔓 登出' : '老師登入';
+  if (currentTeacher) {
+    btn.textContent = `${teacherName || '老師'}🔒`;
+  } else {
+    btn.textContent = '老師登入';
+  }
 }
 
-document.getElementById('adminBtn').addEventListener('click', async () => {
+document.getElementById('adminBtn').addEventListener('click', (e) => {
   if (currentTeacher) {
-    // 登出
-    currentTeacher = null;
-    teacherId = null;
-    updateTeacherBtn();
-    document.getElementById('adminPanel').classList.remove('open');
-    await signOut(auth);
-    if (currentView === 'calendar') renderCalendar(); else renderList();
-    showToast('已登出！');
-    return;
+    const dropdown = document.getElementById('teacherDropdown');
+    const isOpen = dropdown.classList.contains('open');
+    dropdown.classList.toggle('open', !isOpen);
+    e.stopPropagation();
+  } else {
+    document.getElementById('loginError').textContent = '';
+    document.getElementById('loginOverlay').classList.add('open');
   }
-  document.getElementById('loginError').textContent = '';
-  document.getElementById('loginOverlay').classList.add('open');
+});
+
+document.getElementById('teacherLogoutBtn').addEventListener('click', async () => {
+  document.getElementById('teacherDropdown').classList.remove('open');
+  currentTeacher = null;
+  teacherId = null;
+  teacherName = null;
+  updateTeacherBtn();
+  document.getElementById('adminPanel').classList.remove('open');
+  await signOut(auth);
+  if (currentView === 'calendar') renderCalendar(); else renderList();
+  showToast('已登出！');
 });
 
 document.getElementById('loginCancel').addEventListener('click', () => {
@@ -1043,6 +1056,7 @@ document.getElementById('teacherGoogleLoginBtn').addEventListener('click', async
     // 授權成功
     currentTeacher = user;
     teacherId = adminSnap.data().teacherId;
+    teacherName = adminSnap.data().name || null;
     document.getElementById('loginOverlay').classList.remove('open');
     updateTeacherBtn();
     await loadFromStorage();
@@ -1092,6 +1106,7 @@ document.getElementById('studentBtn').addEventListener('click', (e) => {
 // 點其他地方關閉下拉
 document.addEventListener('click', () => {
   document.getElementById('studentDropdown').classList.remove('open');
+  document.getElementById('teacherDropdown').classList.remove('open');
 });
 
 // 登入
@@ -1500,6 +1515,7 @@ function renderHomeSections() {
     if (adminSnap.exists()) {
       currentTeacher = user;
       teacherId = adminSnap.data().teacherId;
+      teacherName = adminSnap.data().name || null;
       updateTeacherBtn();
       await loadFromStorage();
       renderCalendar();
