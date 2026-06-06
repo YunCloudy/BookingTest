@@ -1686,9 +1686,8 @@ function renderAdmin() {
     filterBar.className = 'admin-tab-bar';
     filterBar.style.marginBottom = '12px';
     filterBar.innerHTML = `
-      <button class="admin-tab active" data-filter="pending">待處理 (${orders.filter(o=>o.status==='pending').length})</button>
-      <button class="admin-tab" data-filter="confirmed">已確認 (${orders.filter(o=>o.status==='confirmed').length})</button>
-      <button class="admin-tab" data-filter="cancelled">已取消 (${orders.filter(o=>o.status==='cancelled').length})</button>
+      <button class="admin-tab active" data-filter="pending">待審核 (${orders.filter(o=>o.status==='pending').length})</button>
+      <button class="admin-tab" data-filter="reviewed">已審核 (${orders.filter(o=>o.status!=='pending').length})</button>
     `;
     orderSection.appendChild(filterBar);
 
@@ -1699,11 +1698,13 @@ function renderAdmin() {
 
     function renderFilteredOrders(filter) {
       listWrap.innerHTML = '';
-      const filtered = orders.filter(o => o.status === filter);
+      const filtered = filter === 'reviewed'
+      ? orders.filter(o => o.status !== 'pending')
+      : orders.filter(o => o.status === filter);
       if (filtered.length === 0) {
         const hint = document.createElement('div');
         hint.className = 'order-empty-hint';
-        hint.textContent = `沒有${filter === 'pending' ? '待處理' : filter === 'confirmed' ? '已確認' : '已取消'}的訂單`;
+        hint.textContent = `沒有${filter === 'pending' ? '待審核' : '已審核'}的訂單`;
         listWrap.appendChild(hint);
         return;
       }
@@ -1941,18 +1942,32 @@ function renderHomeSections() {
   renderCalendar();
   renderHomeSections();
 
-  // 學生狀態監聽（老師登入不走這邊）
+  // 登入狀態監聽：重整後恢復老師或學生狀態
   onAuthStateChanged(auth, async user => {
     if (!user) {
       currentStudent = null;
+      currentTeacher = null;
+      teacherId = null;
+      teacherName = null;
       updateStudentBtn();
+      updateTeacherBtn();
+      updateCartBtn();
       return;
     }
-    // 如果是老師就不當學生處理
+    // 先查是不是老師
     try {
       const adminSnap = await getDoc(doc(db, 'admins', user.uid));
-      if (adminSnap.exists()) return; // 老師，跳過
+      if (adminSnap.exists()) {
+        // 恢復老師狀態
+        currentTeacher = user;
+        teacherId = adminSnap.data().teacherId;
+        teacherName = adminSnap.data().name || null;
+        updateTeacherBtn();
+        await loadFromStorage();
+        return;
+      }
     } catch(e) {}
+    // 學生
     currentStudent = user;
     try {
       const snap = await getDoc(doc(db, 'users', user.uid));
@@ -1961,6 +1976,7 @@ function renderHomeSections() {
     } catch(e) {
       updateStudentBtn();
     }
+    updateCartBtn();
   });
 
   // redirect 登入結果獨立處理，不阻塞頁面

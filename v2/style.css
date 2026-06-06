@@ -1460,7 +1460,7 @@ main { padding: 20px 16px 40px; max-width: 680px; margin: 0 auto; }
   background: var(--rose-dark);
   color: white;
   font-size: 0.85rem;
-  font-weight: 600;
+  font-weight: 400;
   cursor: pointer;
   font-family: inherit;
   transition: opacity 0.15s;
@@ -1475,9 +1475,10 @@ main { padding: 20px 16px 40px; max-width: 680px; margin: 0 auto; }
   padding: 9px;
   border: none;
   border-radius: 8px;
-  background: var(--mocha);
-  color: var(--oat);
+  background: #7a6560;
+  color: white;
   font-size: 0.85rem;
+  font-weight: 400;
   cursor: pointer;
   font-family: inherit;
   transition: opacity 0.15s;
