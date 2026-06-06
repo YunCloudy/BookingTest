@@ -19,6 +19,7 @@
     <div class="header-btns">
       <button id="adminBtn">老師登入</button>
       <button id="studentBtn">學生登入</button>
+      <button id="cartBtn" style="display:none">🛒<span id="cartCount" class="cart-badge"></span></button>
     </div>
   </header>
 
@@ -124,6 +125,26 @@
     <button class="btn-primary" id="studentProfileSave" style="width:100%">儲存</button>
     <br>
     <button class="login-cancel" id="studentProfileCancel">取消</button>
+  </div>
+</div>
+
+<!-- CART OVERLAY -->
+<div class="login-overlay" id="cartOverlay">
+  <div class="login-box" style="max-width:400px;max-height:80vh;overflow-y:auto">
+    <div style="font-size:2rem;margin-bottom:8px">🛒</div>
+    <h3>購物車</h3>
+    <div id="cartList"></div>
+    <div id="cartForm" style="display:none">
+      <hr style="margin:16px 0;border:none;border-top:1px solid var(--rose-light)">
+      <div style="text-align:left;margin-bottom:6px;font-size:0.82rem;color:#7a6560">你的名稱</div>
+      <input type="text" id="cartName" placeholder="輸入姓名" maxlength="20" style="margin-bottom:12px">
+      <div style="text-align:left;margin-bottom:6px;font-size:0.82rem;color:#7a6560">聯絡電話（選填）</div>
+      <input type="tel" id="cartPhone" placeholder="輸入電話" maxlength="15" style="margin-bottom:16px">
+      <button class="btn-primary" id="cartSubmitBtn" style="width:100%">送出訂單</button>
+      <div class="login-error" id="cartError"></div>
+    </div>
+    <br>
+    <button class="login-cancel" id="cartCancel">關閉</button>
   </div>
 </div>
 
