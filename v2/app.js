@@ -1121,8 +1121,18 @@ document.getElementById('googleLoginBtn').addEventListener('click', async () => 
   document.getElementById('studentLoginError').textContent = '';
   try {
     const result = await signInWithPopup(auth, googleProvider);
-    if (result?.user) {
+    const user = result?.user;
+    if (user) {
+      currentStudent = user;
       document.getElementById('studentLoginOverlay').classList.remove('open');
+      // 讀暱稱後更新按鈕
+      try {
+        const snap = await getDoc(doc(db, 'users', user.uid));
+        const nickname = snap.exists() ? snap.data().nickname : null;
+        updateStudentBtn(nickname);
+      } catch(e) {
+        updateStudentBtn();
+      }
       showToast('登入成功！');
     }
   } catch (e) {
