@@ -33,7 +33,7 @@
 // ── FIREBASE ──
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot, collection, getDocs, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-import { getAuth, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getAuth, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut, onAuthStateChanged, browserLocalPersistence, browserSessionPersistence, setPersistence } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyB2pcS4xZViD7bhP8OpXK-tYAh851szUIE",
@@ -972,14 +972,13 @@ function updateCartBtn() {
     return;
   }
   btn.style.display = '';
-  if (badge) {
-    if (cart.length > 0) {
-      badge.textContent = cart.length;
-      badge.style.display = 'flex';
-    } else {
-      badge.textContent = '';
-      badge.style.display = 'none';
-    }
+  if (!badge) return;
+  if (cart.length > 0) {
+    badge.textContent = cart.length;
+    badge.style.display = 'inline-flex';
+  } else {
+    badge.textContent = '';
+    badge.style.display = 'none';
   }
 }
 
@@ -1184,6 +1183,7 @@ document.getElementById('teacherGoogleLoginBtn').addEventListener('click', async
   btn.disabled = true;
   document.getElementById('loginError').textContent = '';
   try {
+    await setPersistence(auth, browserLocalPersistence);
     const result = await signInWithPopup(auth, googleProvider);
     const user = result?.user;
     if (!user) throw new Error('no user');
@@ -1273,6 +1273,7 @@ document.getElementById('googleLoginBtn').addEventListener('click', async () => 
   btn.disabled = true;
   document.getElementById('studentLoginError').textContent = '';
   try {
+    await setPersistence(auth, browserSessionPersistence);
     const result = await signInWithPopup(auth, googleProvider);
     const user = result?.user;
     if (user) {
