@@ -1165,6 +1165,7 @@ document.getElementById('teacherLogoutConfirm').addEventListener('click', async 
   currentTeacher = null;
   teacherId = null;
   teacherName = null;
+  sessionStorage.removeItem('loginRole');
   updateTeacherBtn();
   document.getElementById('teacherLogoutOverlay').classList.remove('open');
   document.getElementById('adminPanel').classList.remove('open');
@@ -1203,6 +1204,7 @@ document.getElementById('teacherGoogleLoginBtn').addEventListener('click', () =>
     currentTeacher = user;
     teacherId = adminSnap.data().teacherId;
     teacherName = adminSnap.data().name || null;
+    sessionStorage.setItem('loginRole', 'teacher');
     btn.innerHTML = GOOGLE_BTN_INNER;
     btn.disabled = false;
     document.getElementById('loginOverlay').classList.remove('open');
@@ -1277,6 +1279,7 @@ document.getElementById('googleLoginBtn').addEventListener('click', () => {
       document.getElementById('adminPanel').classList.remove('open');
     }
     currentStudent = user;
+    sessionStorage.setItem('loginRole', 'student');
     document.getElementById('studentLoginOverlay').classList.remove('open');
     try {
       const snap = await getDoc(doc(db, 'users', user.uid));
@@ -1338,6 +1341,7 @@ document.getElementById('studentLogoutCancel').addEventListener('click', () => {
 
 document.getElementById('studentLogoutConfirm').addEventListener('click', async () => {
   currentStudent = null;
+  sessionStorage.removeItem('loginRole');
   updateStudentBtn();
   resetGoogleLoginBtn();
   document.getElementById('studentLogoutOverlay').classList.remove('open');
@@ -1946,20 +1950,36 @@ function renderHomeSections() {
     }
     // 已經有狀態（popup登入剛處理完）→ 不重複處理
     if (currentTeacher || currentStudent) return;
-    // 先查是不是老師
-    try {
-      const adminSnap = await getDoc(doc(db, 'admins', user.uid));
-      if (adminSnap.exists()) {
-        // 恢復老師狀態
-        currentTeacher = user;
-        teacherId = adminSnap.data().teacherId;
-        teacherName = adminSnap.data().name || null;
-        updateTeacherBtn();
-        await loadFromStorage();
-        return;
+    // 依 sessionStorage 記錄的身份恢復
+    const savedRole = sessionStorage.getItem('loginRole');
+    if (savedRole === 'teacher') {
+      // 恢復老師狀態
+      try {
+        const adminSnap = await getDoc(doc(db, 'admins', user.uid));
+        if (adminSnap.exists()) {
+          currentTeacher = user;
+          teacherId = adminSnap.data().teacherId;
+          teacherName = adminSnap.data().name || null;
+          updateTeacherBtn();
+          await loadFromStorage();
+          return;
+        }
+      } catch(e) {}
+    }
+    if (savedRole === 'student') {
+      // 恢復學生狀態
+      currentStudent = user;
+      try {
+        const snap = await getDoc(doc(db, 'users', user.uid));
+        const nickname = snap.exists() ? snap.data().nickname : null;
+        updateStudentBtn(nickname);
+      } catch(e) {
+        updateStudentBtn();
       }
-    } catch(e) {}
-    // 學生
+      updateCartBtn();
+      return;
+    }
+    // savedRole 不存在（舊 session 或直接訪問）→ 預設當學生
     currentStudent = user;
     try {
       const snap = await getDoc(doc(db, 'users', user.uid));
