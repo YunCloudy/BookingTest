@@ -1954,6 +1954,8 @@ function renderHomeSections() {
       updateCartBtn();
       return;
     }
+    // 已經有狀態（popup登入剛處理完）→ 不重複處理
+    if (currentTeacher || currentStudent) return;
     // 先查是不是老師
     try {
       const adminSnap = await getDoc(doc(db, 'admins', user.uid));
