@@ -17,9 +17,8 @@
       <div class="subtitle">AERIAL BOOKING</div>
     </div>
     <div class="header-btns">
-      <button id="adminBtn">老師登入</button>
-      <button id="studentBtn">學生登入</button>
-      <button id="cartBtn" class="cart-btn" style="display:none">🛒<span id="cartBadge" class="cart-badge">0</span></button>
+      <button id="loginBtn">登入 ▾</button>
+      <button id="cartBtn" class="cart-btn" style="display:none">購物車<span id="cartBadge" class="cart-badge">0</span></button>
     </div>
   </header>
 
@@ -91,7 +90,13 @@
   </div>
 </div>
 
-<!-- TEACHER DROPDOWN MENU -->
+<!-- LOGIN DROPDOWN（未登入） -->
+<div class="student-dropdown" id="loginDropdown">
+  <button class="student-dropdown-item" id="teacherLoginDropBtn">💮 老師登入</button>
+  <button class="student-dropdown-item" id="studentLoginDropBtn">🌸 學生登入</button>
+</div>
+
+<!-- TEACHER DROPDOWN（老師登入後） -->
 <div class="student-dropdown" id="teacherDropdown">
   <button class="student-dropdown-item" id="teacherLogoutBtn">🚪 登出</button>
 </div>

@@ -1101,24 +1101,40 @@ function showToast(msg) {
 
 // ── TEACHER LOGIN ──
 function updateTeacherBtn() {
-  const btn = document.getElementById('adminBtn');
+  const loginBtn = document.getElementById('loginBtn');
+  const cartBtn = document.getElementById('cartBtn');
   if (currentTeacher) {
-    btn.textContent = `${teacherName || '老師'}🔒`;
-  } else {
-    btn.textContent = '老師登入';
+    loginBtn.textContent = `${teacherName || '老師'} 🔒`;
+    if (cartBtn) cartBtn.style.display = 'none';
+  } else if (!currentStudent) {
+    loginBtn.textContent = '登入 ▾';
   }
 }
 
-document.getElementById('adminBtn').addEventListener('click', (e) => {
+document.getElementById('loginBtn').addEventListener('click', (e) => {
+  e.stopPropagation();
   if (currentTeacher) {
-    const dropdown = document.getElementById('teacherDropdown');
-    const isOpen = dropdown.classList.contains('open');
-    dropdown.classList.toggle('open', !isOpen);
-    e.stopPropagation();
+    const dd = document.getElementById('teacherDropdown');
+    dd.classList.toggle('open', !dd.classList.contains('open'));
+  } else if (currentStudent) {
+    const dd = document.getElementById('studentDropdown');
+    dd.classList.toggle('open', !dd.classList.contains('open'));
   } else {
-    document.getElementById('loginError').textContent = '';
-    document.getElementById('loginOverlay').classList.add('open');
+    const dd = document.getElementById('loginDropdown');
+    dd.classList.toggle('open', !dd.classList.contains('open'));
   }
+});
+
+document.getElementById('teacherLoginDropBtn').addEventListener('click', () => {
+  document.getElementById('loginDropdown').classList.remove('open');
+  document.getElementById('loginError').textContent = '';
+  document.getElementById('loginOverlay').classList.add('open');
+});
+
+document.getElementById('studentLoginDropBtn').addEventListener('click', () => {
+  document.getElementById('loginDropdown').classList.remove('open');
+  document.getElementById('studentLoginError').textContent = '';
+  document.getElementById('studentLoginOverlay').classList.add('open');
 });
 
 document.getElementById('teacherLogoutBtn').addEventListener('click', () => {
@@ -1211,32 +1227,24 @@ function resetGoogleLoginBtn() {
 }
 
 function updateStudentBtn(nickname) {
-  const btn = document.getElementById('studentBtn');
+  const loginBtn = document.getElementById('loginBtn');
+  const cartBtn = document.getElementById('cartBtn');
   if (currentStudent) {
     const name = nickname || (currentStudent.displayName ? currentStudent.displayName.split(' ')[0] : '學生');
-    btn.textContent = `${name} ▾`;
-  } else {
-    btn.textContent = '學生登入';
+    loginBtn.textContent = `${name} ▾`;
+    updateCartBtn();
+  } else if (!currentTeacher) {
+    loginBtn.textContent = '登入 ▾';
   }
 }
 
-// 學生按鈕 → 登入或下拉選單
-document.getElementById('studentBtn').addEventListener('click', (e) => {
-  if (currentStudent) {
-    const dropdown = document.getElementById('studentDropdown');
-    const isOpen = dropdown.classList.contains('open');
-    dropdown.classList.toggle('open', !isOpen);
-    e.stopPropagation();
-  } else {
-    document.getElementById('studentLoginError').textContent = '';
-    document.getElementById('studentLoginOverlay').classList.add('open');
-  }
-});
+// 學生按鈕邏輯已合併到 loginBtn
 
 // 點其他地方關閉下拉
 document.addEventListener('click', () => {
   document.getElementById('studentDropdown').classList.remove('open');
   document.getElementById('teacherDropdown').classList.remove('open');
+  document.getElementById('loginDropdown').classList.remove('open');
 });
 
 // 登入
