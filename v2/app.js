@@ -836,7 +836,7 @@ document.getElementById('calNext').addEventListener('click', () => {
 
 // ── MODAL ROSTER (admin) ──
 function renderModalRoster(course) {
-  const list = bookings[course.id];
+  const list = bookings[course.id] || [];
   const itemsHtml = list.length === 0
     ? '<div class="modal-no-roster">尚無報名學員</div>'
     : list.map((b, i) => `
@@ -1115,8 +1115,9 @@ ${isAdmin() ? renderModalRoster(course) : (isEnrolled(course.id) ? `
   if (isAdmin()) {
     bindModalRosterEvents(course);
   } else {
-    if (!isFull && !cartHasItem(course.id)) {
-      document.getElementById('addToCartBtn').addEventListener('click', () => {
+    const addToCartBtn = document.getElementById('addToCartBtn');
+    if (addToCartBtn) {
+      addToCartBtn.addEventListener('click', () => {
         addToCart(course);
         const area = document.getElementById('cartBtnArea');
         if (area) area.innerHTML = '<div class="cart-added-label">✓ 已加入購物車</div><button class="btn-cart btn-cart-added" disabled>已在購物車中</button>';
@@ -2190,9 +2191,15 @@ function renderAdmin() {
             for (const c of order.courses) {
               if (c.result !== 'confirmed') continue;
               const list = bookings[c.courseId] || [];
-              if (!list.some(b => b.name === order.studentName)) {
+              if (!list.some(b => b.studentId === order.studentId || b.name === order.studentName)) {
                 const now = new Date().toLocaleString('zh-TW', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' });
-                list.push({ name: order.studentName, phone: order.phone || '', time: now });
+                list.push({
+                  name: order.studentName,
+                  phone: order.phone || '',
+                  time: now,
+                  studentId: order.studentId,
+                  orderId: orderId
+                });
                 bookings[c.courseId] = list;
               }
             }
