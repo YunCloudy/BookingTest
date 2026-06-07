@@ -1422,6 +1422,14 @@ main { padding: 20px 16px 40px; max-width: 680px; margin: 0 auto; }
   background: #e0dbd8;
   color: #7a6560;
 }
+.order-course-btn-confirm.selected {
+  background: #e8f5e9;
+  color: #388e3c;
+}
+.order-course-btn-cancel.selected {
+  background: #fdecea;
+  color: #e53935;
+}
 .order-course-btn-confirm:disabled,
 .order-course-btn-cancel:disabled {
   opacity: 0.5;
@@ -1451,6 +1459,24 @@ main { padding: 20px 16px 40px; max-width: 680px; margin: 0 auto; }
   display: flex;
   gap: 8px;
   margin-top: 10px;
+}
+.order-btn-finish {
+  flex: 1;
+  padding: 9px;
+  border: none;
+  border-radius: 8px;
+  background: #388e3c;
+  color: white;
+  font-size: 0.85rem;
+  font-weight: 400;
+  cursor: pointer;
+  font-family: inherit;
+  transition: opacity 0.15s;
+}
+.order-btn-finish:hover { opacity: 0.85; }
+.order-btn-finish:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 .order-btn-confirm {
   flex: 1;

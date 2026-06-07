@@ -1742,8 +1742,18 @@ function renderAdmin() {
 
         const bulkActionHtml = isPending ? `
           <div class="order-actions">
-            <button class="order-btn-confirm" data-id="${order.id}">✓ 全部確認</button>
-            <button class="order-btn-cancel" data-id="${order.id}">✕ 全部取消</button>
+            <button class="order-btn-bulk-confirm" data-id="${order.id}">✓ 全部確認</button>
+            <button class="order-btn-bulk-cancel" data-id="${order.id}">✕ 全部取消</button>
+          </div>
+          <div class="order-cancel-reason-wrap order-bulk-cancel-reason" style="display:none">
+            <div class="order-cancel-reason-label">全部取消原因</div>
+            <div class="order-cancel-reason-btns">
+              ${CANCEL_REASONS.map(r => `<button class="order-bulk-reason-btn" data-reason="${r}">${r}</button>`).join('')}
+            </div>
+          </div>
+          <div class="order-actions" style="margin-top:8px">
+            <button class="order-btn-finish" data-id="${order.id}">審核完成 ✓</button>
+            <button class="order-btn-cancel" data-id="${order.id}">取消整筆</button>
           </div>
         ` : '';
 
@@ -1756,81 +1766,160 @@ function renderAdmin() {
           ${order.phone ? `<div class="order-phone">📞 ${order.phone}</div>` : ''}
           <div class="order-courses">${coursesHtml}</div>
           ${order.note ? `<div class="order-note">備註：${order.note}</div>` : ''}
-          ${bulkActionHtml}
-          <div class="order-cancel-reason-wrap" style="display:none">
+          <div class="order-cancel-reason-wrap order-single-cancel-reason" style="display:none">
             <div class="order-cancel-reason-label">取消原因</div>
             <div class="order-cancel-reason-btns">
               ${CANCEL_REASONS.map(r => `<button class="order-reason-btn" data-reason="${r}">${r}</button>`).join('')}
             </div>
           </div>
+          ${bulkActionHtml}
         `;
         listWrap.appendChild(card);
       });
 
-      // ── 單堂確認 ──
+      // ── 單堂確認（本地暫存，標綠）──
       listWrap.querySelectorAll('.order-course-btn-confirm').forEach(btn => {
-        btn.addEventListener('click', async () => {
+        btn.addEventListener('click', () => {
           const orderId = btn.dataset.orderId;
           const idx = parseInt(btn.dataset.courseIdx);
           const order = orders.find(o => o.id === orderId);
           if (!order) return;
-          btn.textContent = '…'; btn.disabled = true;
-          try {
-            const tid = teacherId || TEACHER_ID_STATIC;
-            order.courses[idx].result = 'confirmed';
-            await updateDoc(doc(db, 'teachers', tid, 'orders', orderId), { courses: order.courses });
-            const c = order.courses[idx];
-            const list = bookings[c.courseId] || [];
-            if (!list.some(b => b.name === order.studentName)) {
-              const now = new Date().toLocaleString('zh-TW', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' });
-              list.push({ name: order.studentName, phone: order.phone || '', time: now });
-              bookings[c.courseId] = list;
-            }
-            await saveToStorage();
-            // 全部課程都處理完 → 自動更新整筆訂單狀態
-            const allDone = order.courses.every(x => x.result === 'confirmed' || x.result === 'cancelled');
-            if (allDone) {
-              const allConfirmed = order.courses.every(x => x.result === 'confirmed');
-              const newStatus = allConfirmed ? 'confirmed' : 'cancelled';
-              await updateDoc(doc(db, 'teachers', tid, 'orders', orderId), { status: newStatus });
-              order.status = newStatus;
-            }
-            if (currentView === 'calendar') renderCalendar(); else renderList();
-            showToast(`已確認：${c.title} ✨`);
-            renderOrderSection();
-          } catch(e) {
-            showToast('操作失敗，請再試一次');
-            btn.textContent = '✓'; btn.disabled = false;
+          const card = btn.closest('.admin-card');
+          // 取消同一堂的叉選中狀態
+          const cancelBtn = card.querySelector(`.order-course-btn-cancel[data-order-id="${orderId}"][data-course-idx="${idx}"]`);
+          if (cancelBtn) cancelBtn.classList.remove('selected');
+          // 關掉單堂取消理由區（如果有開）
+          const singleReason = card.querySelector('.order-single-cancel-reason');
+          if (singleReason && singleReason.dataset.courseIdx == idx) {
+            singleReason.style.display = 'none';
+            delete order.courses[idx].cancelReason;
+          }
+          // 切換選中狀態
+          if (btn.classList.contains('selected')) {
+            btn.classList.remove('selected');
+            delete order.courses[idx].localResult;
+          } else {
+            btn.classList.add('selected');
+            order.courses[idx].localResult = 'confirmed';
           }
         });
       });
 
-      // ── 單堂取消（選理由）──
+      // ── 單堂取消（選理由後本地暫存，標紅）──
       listWrap.querySelectorAll('.order-course-btn-cancel').forEach(btn => {
         btn.addEventListener('click', () => {
           const orderId = btn.dataset.orderId;
           const idx = parseInt(btn.dataset.courseIdx);
           const card = btn.closest('.admin-card');
-          const reasonWrap = card.querySelector('.order-cancel-reason-wrap');
-          reasonWrap.style.display = 'block';
-          reasonWrap.dataset.orderId = orderId;
-          reasonWrap.dataset.courseIdx = idx;
-          reasonWrap.dataset.mode = 'single';
+          const singleReason = card.querySelector('.order-single-cancel-reason');
+          // 開理由選單
+          singleReason.style.display = 'block';
+          singleReason.dataset.orderId = orderId;
+          singleReason.dataset.courseIdx = idx;
         });
       });
 
-      // ── 整筆確認 ──
-      listWrap.querySelectorAll('.order-btn-confirm').forEach(btn => {
+      // ── 單堂取消理由按鈕（本地暫存）──
+      listWrap.querySelectorAll('.order-reason-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const reasonWrap = btn.closest('.order-single-cancel-reason');
+          const orderId = reasonWrap.dataset.orderId;
+          const idx = parseInt(reasonWrap.dataset.courseIdx);
+          const reason = btn.dataset.reason;
+          const order = orders.find(o => o.id === orderId);
+          if (!order) return;
+          const card = btn.closest('.admin-card');
+          // 取消同一堂的勾選中狀態
+          const confirmBtn = card.querySelector(`.order-course-btn-confirm[data-order-id="${orderId}"][data-course-idx="${idx}"]`);
+          if (confirmBtn) confirmBtn.classList.remove('selected');
+          // 標記叉為選中
+          const cancelBtn = card.querySelector(`.order-course-btn-cancel[data-order-id="${orderId}"][data-course-idx="${idx}"]`);
+          if (cancelBtn) cancelBtn.classList.add('selected');
+          // 本地暫存
+          order.courses[idx].localResult = 'cancelled';
+          order.courses[idx].cancelReason = reason;
+          reasonWrap.style.display = 'none';
+          showToast(`${order.courses[idx].title} 標記為取消（${reason}）`);
+        });
+      });
+
+      // ── 全部確認（本地暫存，全標綠）──
+      listWrap.querySelectorAll('.order-btn-bulk-confirm').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const orderId = btn.dataset.id;
+          const order = orders.find(o => o.id === orderId);
+          if (!order) return;
+          const card = btn.closest('.admin-card');
+          order.courses.forEach((c, idx) => {
+            c.localResult = 'confirmed';
+            delete c.cancelReason;
+            const confirmBtn = card.querySelector(`.order-course-btn-confirm[data-order-id="${orderId}"][data-course-idx="${idx}"]`);
+            const cancelBtn = card.querySelector(`.order-course-btn-cancel[data-order-id="${orderId}"][data-course-idx="${idx}"]`);
+            if (confirmBtn) confirmBtn.classList.add('selected');
+            if (cancelBtn) cancelBtn.classList.remove('selected');
+          });
+          // 關掉理由區
+          card.querySelector('.order-single-cancel-reason').style.display = 'none';
+          card.querySelector('.order-bulk-cancel-reason').style.display = 'none';
+        });
+      });
+
+      // ── 全部取消（選理由後本地暫存，全標紅）──
+      listWrap.querySelectorAll('.order-btn-bulk-cancel').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const orderId = btn.dataset.id;
+          const card = btn.closest('.admin-card');
+          const bulkReason = card.querySelector('.order-bulk-cancel-reason');
+          bulkReason.style.display = 'block';
+          bulkReason.dataset.orderId = orderId;
+        });
+      });
+
+      // ── 全部取消理由按鈕（本地暫存）──
+      listWrap.querySelectorAll('.order-bulk-reason-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const reasonWrap = btn.closest('.order-bulk-cancel-reason');
+          const orderId = reasonWrap.dataset.orderId;
+          const reason = btn.dataset.reason;
+          const order = orders.find(o => o.id === orderId);
+          if (!order) return;
+          const card = btn.closest('.admin-card');
+          order.courses.forEach((c, idx) => {
+            c.localResult = 'cancelled';
+            c.cancelReason = reason;
+            const confirmBtn = card.querySelector(`.order-course-btn-confirm[data-order-id="${orderId}"][data-course-idx="${idx}"]`);
+            const cancelBtn = card.querySelector(`.order-course-btn-cancel[data-order-id="${orderId}"][data-course-idx="${idx}"]`);
+            if (confirmBtn) confirmBtn.classList.remove('selected');
+            if (cancelBtn) cancelBtn.classList.add('selected');
+          });
+          reasonWrap.style.display = 'none';
+          showToast(`全部標記為取消（${reason}）`);
+        });
+      });
+
+      // ── 審核完成（一次寫入 Firestore）──
+      listWrap.querySelectorAll('.order-btn-finish').forEach(btn => {
         btn.addEventListener('click', async () => {
           const orderId = btn.dataset.id;
           const order = orders.find(o => o.id === orderId);
           if (!order) return;
-          btn.textContent = '處理中…'; btn.disabled = true;
+          // 確認每堂都有標記
+          const allMarked = order.courses.every(c => c.localResult === 'confirmed' || c.localResult === 'cancelled');
+          if (!allMarked) {
+            showToast('請先對每堂課標記確認或取消');
+            return;
+          }
+          btn.textContent = '儲存中…'; btn.disabled = true;
           try {
             const tid = teacherId || TEACHER_ID_STATIC;
-            order.courses = order.courses.map(c => ({ ...c, result: 'confirmed' }));
-            await updateDoc(doc(db, 'teachers', tid, 'orders', orderId), { status: 'confirmed', courses: order.courses });
+            // 把 localResult 寫入 result
+            order.courses = order.courses.map(c => ({ ...c, result: c.localResult, localResult: undefined }));
+            const allConfirmed = order.courses.every(c => c.result === 'confirmed');
+            const newStatus = allConfirmed ? 'confirmed' : 'cancelled';
+            await updateDoc(doc(db, 'teachers', tid, 'orders', orderId), { status: newStatus, courses: order.courses });
+            // 更新 bookings（只加確認的）
             for (const c of order.courses) {
+              if (c.result !== 'confirmed') continue;
               const list = bookings[c.courseId] || [];
               if (!list.some(b => b.name === order.studentName)) {
                 const now = new Date().toLocaleString('zh-TW', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' });
@@ -1839,66 +1928,34 @@ function renderAdmin() {
               }
             }
             await saveToStorage();
-            order.status = 'confirmed';
+            order.status = newStatus;
             if (currentView === 'calendar') renderCalendar(); else renderList();
-            showToast(`已確認 ${order.studentName} 的訂單 ✨`);
+            showToast(`審核完成：${order.studentName} ✨`);
             renderOrderSection();
           } catch(e) {
             showToast('操作失敗，請再試一次');
-            btn.textContent = '✓ 全部確認'; btn.disabled = false;
+            btn.textContent = '審核完成 ✓'; btn.disabled = false;
           }
         });
       });
 
-      // ── 整筆取消（選理由）──
+      // ── 取消整筆（直接寫 Firestore，不用理由）──
       listWrap.querySelectorAll('.order-btn-cancel').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const orderId = btn.dataset.id;
-          const card = btn.closest('.admin-card');
-          const reasonWrap = card.querySelector('.order-cancel-reason-wrap');
-          reasonWrap.style.display = 'block';
-          reasonWrap.dataset.orderId = orderId;
-          reasonWrap.dataset.mode = 'bulk';
-        });
-      });
-
-      // ── 理由按鈕 ──
-      listWrap.querySelectorAll('.order-reason-btn').forEach(btn => {
         btn.addEventListener('click', async () => {
-          const reasonWrap = btn.closest('.order-cancel-reason-wrap');
-          const orderId = reasonWrap.dataset.orderId;
-          const mode = reasonWrap.dataset.mode;
-          const reason = btn.dataset.reason;
+          const orderId = btn.dataset.id;
           const order = orders.find(o => o.id === orderId);
           if (!order) return;
           btn.textContent = '處理中…'; btn.disabled = true;
           try {
             const tid = teacherId || TEACHER_ID_STATIC;
-            if (mode === 'bulk') {
-              order.courses = order.courses.map(c => ({ ...c, result: 'cancelled', cancelReason: reason }));
-              await updateDoc(doc(db, 'teachers', tid, 'orders', orderId), { status: 'cancelled', cancelReason: reason, courses: order.courses });
-              order.status = 'cancelled';
-              showToast(`訂單已取消：${reason}`);
-              renderOrderSection();
-            } else {
-              const idx = parseInt(reasonWrap.dataset.courseIdx);
-              order.courses[idx].result = 'cancelled';
-              order.courses[idx].cancelReason = reason;
-              await updateDoc(doc(db, 'teachers', tid, 'orders', orderId), { courses: order.courses });
-              // 全部課程都處理完 → 自動更新整筆訂單狀態
-              const allDone = order.courses.every(x => x.result === 'confirmed' || x.result === 'cancelled');
-              if (allDone) {
-                const allConfirmed = order.courses.every(x => x.result === 'confirmed');
-                const newStatus = allConfirmed ? 'confirmed' : 'cancelled';
-                await updateDoc(doc(db, 'teachers', tid, 'orders', orderId), { status: newStatus });
-                order.status = newStatus;
-              }
-              showToast(`已取消：${order.courses[idx].title}（${reason}）`);
-              renderOrderSection();
-            }
+            order.courses = order.courses.map(c => ({ ...c, result: 'cancelled' }));
+            await updateDoc(doc(db, 'teachers', tid, 'orders', orderId), { status: 'cancelled', courses: order.courses });
+            order.status = 'cancelled';
+            showToast(`已取消 ${order.studentName} 的訂單`);
+            renderOrderSection();
           } catch(e) {
             showToast('操作失敗，請再試一次');
-            btn.textContent = reason; btn.disabled = false;
+            btn.textContent = '取消整筆'; btn.disabled = false;
           }
         });
       });
@@ -1931,7 +1988,7 @@ function renderHomeSections() {
 // ── INIT初始化 ──
 (async () => {
   // 先跑頁面初始化，不等 redirect 結果
-  setTimeout(() => showToast('v16'), 1000);
+  //setTimeout(() => showToast('v16'), 1000); 外觀看不出來的時候確認當前版本沒有卡快取時使用
   await loadFromStorage();
   renderCalendar();
   renderHomeSections();
