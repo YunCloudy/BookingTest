@@ -1189,16 +1189,14 @@ function loadStudentOrders(uid) {
 // 該課程已有「confirmed」的訂單 → 顯示「已報名」標籤
 function isEnrolled(courseId) {
   return studentOrders.some(o =>
-    o.status === 'confirmed' &&
-    o.courses?.some(c => c.courseId === courseId)
+    o.courses?.some(c => c.courseId === courseId && c.result === 'confirmed')
   );
 }
 
 // 該課程有「pending」的訂單 → 顯示「審核中」標籤，同時擋重複加入
 function hasPendingOrder(courseId) {
   return studentOrders.some(o =>
-    o.status === 'pending' &&
-    o.courses?.some(c => c.courseId === courseId)
+    o.courses?.some(c => c.courseId === courseId && c.result === 'pending')
   );
 }
 
