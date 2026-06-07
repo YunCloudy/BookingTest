@@ -1542,7 +1542,8 @@ main { padding: 20px 16px 40px; max-width: 680px; margin: 0 auto; }
   flex-wrap: wrap;
   gap: 6px;
 }
-.order-reason-btn {
+.order-reason-btn,
+.order-bulk-reason-btn {
   padding: 5px 12px;
   border-radius: 20px;
   border: 1px solid #a08880;
@@ -1552,7 +1553,8 @@ main { padding: 20px 16px 40px; max-width: 680px; margin: 0 auto; }
   cursor: pointer;
   font-family: inherit;
 }
-.order-reason-btn:hover {
+.order-reason-btn:hover,
+.order-bulk-reason-btn:hover {
   background: rgba(255,255,255,0.1);
 }
 .order-status-tag {
