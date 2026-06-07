@@ -874,12 +874,22 @@ function bindModalRosterEvents(course) {
       const studentId = btn.dataset.studentId;
       const orderId = btn.dataset.orderId;
 
-      // 有綁定帳號 → 同時把 Firestore order 改成 cancelled
+      // 有綁定帳號 → 只取消該堂課，重新計算 order status
       if (studentId && orderId) {
         try {
-          await updateDoc(doc(db, 'teachers', tid, 'orders', orderId), { status: 'cancelled' });
-          await updateDoc(doc(db, 'users', studentId, 'orders', orderId), { status: 'cancelled' });
-        } catch(e) { console.warn('取消 order 失敗', e); }
+          const orderRef = doc(db, 'teachers', tid, 'orders', orderId);
+          const orderSnap = await getDoc(orderRef);
+          if (orderSnap.exists()) {
+            const orderData = orderSnap.data();
+            const updatedCourses = orderData.courses.map(c =>
+              c.courseId === course.id ? { ...c, result: 'cancelled' } : c
+            );
+            const allCancelled = updatedCourses.every(c => c.result === 'cancelled');
+            const newStatus = allCancelled ? 'cancelled' : 'confirmed';
+            await updateDoc(orderRef, { courses: updatedCourses, status: newStatus });
+            await updateDoc(doc(db, 'users', studentId, 'orders', orderId), { courses: updatedCourses, status: newStatus });
+          }
+        } catch(e) { console.warn('取消單堂失敗', e); }
       }
 
       bookings[course.id].splice(idx, 1);
@@ -937,7 +947,7 @@ function bindModalRosterEvents(course) {
 
       const results = [...seen.values()];
       if (results.length === 0) {
-        dropdown.innerHTML = `<div class="modal-search-hint">查無結果，可直接新增「${keyword}」為佔位</div>`;
+        dropdown.innerHTML = `<div class="modal-search-hint">找不到此學生的報名紀錄，將以佔位方式新增（不連動帳號）</div>`;
       } else {
         dropdown.innerHTML = results.map(r => `
           <div class="modal-search-item" data-student-id="${r.studentId}" data-student-name="${r.studentName}" data-student-email="${r.studentEmail}" data-last-course="${r.lastCourse}" data-last-date="${r.lastDate}">
@@ -977,6 +987,20 @@ function bindModalRosterEvents(course) {
     }
     const phone = document.getElementById('modalAddPhone').value.trim();
     const now = new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' });
+
+    // 防呆：檢查是否已在名單中
+    const existing = bookings[course.id] || [];
+    if (selectedStudent) {
+      if (existing.some(b => b.studentId === selectedStudent.studentId)) {
+        showToast(`${selectedStudent.studentName} 已在名單中`);
+        return;
+      }
+    } else {
+      if (existing.some(b => b.name === name)) {
+        showToast(`「${name}」已在名單中`);
+        return;
+      }
+    }
 
     if (selectedStudent) {
       // ── 綁帳號模式：建 confirmed order + 寫 bookings ──
@@ -2232,9 +2256,11 @@ function renderHomeSections() {
       currentTeacher = null;
       teacherId = null;
       teacherName = null;
+      studentOrders = [];
       updateStudentBtn();
       updateTeacherBtn();
       updateCartBtn();
+      if (currentView === 'calendar') renderCalendar(); else renderList();
       return;
     }
     // 已經有狀態（popup登入剛處理完）→ 不重複處理
