@@ -278,7 +278,7 @@ main { padding: 20px 16px 40px; max-width: 680px; margin: 0 auto; }
   justify-content: flex-end;
   margin-bottom: 4px;
 }
-.card-spots-num { text-align: right; }
+.card-spots-num { text-align: center; }
 .course-card:hover {
   transform: translateY(-2px);
   box-shadow: var(--shadow-lg);
@@ -300,7 +300,7 @@ main { padding: 20px 16px 40px; max-width: 680px; margin: 0 auto; }
 .card-title { font-size: 0.95rem; font-weight: 600; color: var(--ink); margin-bottom: 3px; }
 .card-location { font-size: 0.78rem; color: var(--rose-dark); }
 
-.card-spots { text-align: right; flex-shrink: 0; display: flex; flex-direction: column; justify-content: space-between; align-items: flex-end; }
+.card-spots { text-align: center; flex-shrink: 0; display: flex; flex-direction: column; justify-content: space-between; align-items: center; }
 .spots-num {
   font-family: 'Noto Serif TC', serif;
   font-size: 1.6rem;

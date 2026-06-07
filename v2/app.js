@@ -929,15 +929,19 @@ function openModal(course) {
     <div>${bookings[course.id].map((b,i) => `<div class="modal-roster-item"><span class="modal-roster-name">${i+1}. ${b.name}</span></div>`).join('')}</div>
   </div>
 ` : ''}
-${isAdmin() ? renderModalRoster(course) : (!isFull ? `
+${isAdmin() ? renderModalRoster(course) : (isEnrolled(course.id) ? `
     <div id="cartBtnArea">
-      ${isEnrolled(course.id)
-        ? '<div class="cart-added-label">✓ 已報名此課程</div><button class="btn-cart btn-cart-added" disabled>已報名</button>'
-        : hasPendingOrder(course.id)
-          ? '<div class="cart-added-label">⏳ 訂單審核中</div><button class="btn-cart btn-cart-added" disabled>審核中</button>'
-          : cartHasItem(course.id)
-            ? '<div class="cart-added-label">✓ 已加入購物車</div><button class="btn-cart btn-cart-added" disabled>已在購物車中</button>'
-            : '<button class="btn-cart" id="addToCartBtn">🛒 加入購物車</button>'
+      <div class="cart-added-label">已經報名囉！</div>
+      <button class="btn-cart btn-cart-added" disabled>✓ 已報名</button>
+    </div>` : hasPendingOrder(course.id) ? `
+    <div id="cartBtnArea">
+      <div class="cart-added-label">⏳ 訂單審核中</div>
+      <button class="btn-cart btn-cart-added" disabled>審核中</button>
+    </div>` : !isFull ? `
+    <div id="cartBtnArea">
+      ${cartHasItem(course.id)
+        ? '<div class="cart-added-label">✓ 已加入購物車</div><button class="btn-cart btn-cart-added" disabled>已在購物車中</button>'
+        : '<button class="btn-cart" id="addToCartBtn">🛒 加入購物車</button>'
       }
     </div>` : `
     <div class="full-notice">本班已額滿，如有需要請向老師詢問候補 🙏</div>
