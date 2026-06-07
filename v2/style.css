@@ -1612,3 +1612,60 @@ main { padding: 20px 16px 40px; max-width: 680px; margin: 0 auto; }
   font-size: 0.88rem;
   letter-spacing: 0.02em;
 }
+
+/* ── 手動新增學生：搜尋框 & 下拉 ── */
+.modal-search-wrap {
+  position: relative;
+  width: 100%;
+}
+.modal-search-dropdown {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0; right: 0;
+  background: #fff;
+  border: 1px solid #e0d6d0;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  z-index: 100;
+  max-height: 200px;
+  overflow-y: auto;
+}
+.modal-search-dropdown.open {
+  display: block;
+}
+.modal-search-item {
+  display: flex;
+  flex-direction: column;
+  padding: 10px 14px;
+  cursor: pointer;
+  border-bottom: 1px solid #f0ebe8;
+  transition: background 0.15s;
+}
+.modal-search-item:last-child { border-bottom: none; }
+.modal-search-item:hover { background: #faf5f3; }
+.modal-search-name {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: #3d2b1f;
+}
+.modal-search-meta {
+  font-size: 0.78rem;
+  color: #a08070;
+  margin-top: 2px;
+}
+.modal-search-hint {
+  padding: 12px 14px;
+  font-size: 0.82rem;
+  color: #a08070;
+}
+.modal-roster-linked {
+  display: inline-block;
+  font-size: 0.7rem;
+  background: #e8f4ea;
+  color: #4a8c5c;
+  border-radius: 10px;
+  padding: 1px 7px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
