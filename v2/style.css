@@ -1423,12 +1423,12 @@ main { padding: 20px 16px 40px; max-width: 680px; margin: 0 auto; }
   color: #7a6560;
 }
 .order-course-btn-confirm.selected {
-  background: #e8f5e9;
-  color: #388e3c;
+  background: #7a6560;
+  color: #fff;
 }
 .order-course-btn-cancel.selected {
-  background: #fdecea;
-  color: #e53935;
+  background: #b5a09a;
+  color: #fff;
 }
 .order-course-btn-confirm:disabled,
 .order-course-btn-cancel:disabled {
@@ -1465,7 +1465,7 @@ main { padding: 20px 16px 40px; max-width: 680px; margin: 0 auto; }
   padding: 9px;
   border: none;
   border-radius: 8px;
-  background: #388e3c;
+  background: var(--rose-dark);
   color: white;
   font-size: 0.85rem;
   font-weight: 400;
@@ -1483,7 +1483,7 @@ main { padding: 20px 16px 40px; max-width: 680px; margin: 0 auto; }
   padding: 9px;
   border: none;
   border-radius: 8px;
-  background: var(--rose-dark);
+  background: #7a6560;
   color: white;
   font-size: 0.85rem;
   font-weight: 400;
@@ -1517,12 +1517,12 @@ main { padding: 20px 16px 40px; max-width: 680px; margin: 0 auto; }
 .order-cancel-reason-wrap {
   margin-top: 10px;
   padding: 10px;
-  background: var(--bg);
+  background: rgba(0,0,0,0.1);
   border-radius: 8px;
 }
 .order-cancel-reason-label {
   font-size: 0.78rem;
-  color: #aaa;
+  color: #c9b8b3;
   margin-bottom: 8px;
 }
 .order-cancel-reason-btns {
@@ -1533,15 +1533,15 @@ main { padding: 20px 16px 40px; max-width: 680px; margin: 0 auto; }
 .order-reason-btn {
   padding: 5px 12px;
   border-radius: 20px;
-  border: 1px solid #d8d0cc;
-  background: white;
-  color: #7a6560;
+  border: 1px solid #a08880;
+  background: transparent;
+  color: #e0dbd8;
   font-size: 0.8rem;
   cursor: pointer;
   font-family: inherit;
 }
 .order-reason-btn:hover {
-  background: #e0dbd8;
+  background: rgba(255,255,255,0.1);
 }
 .order-status-tag {
   display: inline-block;

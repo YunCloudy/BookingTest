@@ -1913,7 +1913,7 @@ function renderAdmin() {
           try {
             const tid = teacherId || TEACHER_ID_STATIC;
             // 把 localResult 寫入 result
-            order.courses = order.courses.map(c => ({ ...c, result: c.localResult, localResult: undefined }));
+            order.courses = order.courses.map(({ localResult, ...c }) => ({ ...c, result: localResult }));
             const allConfirmed = order.courses.every(c => c.result === 'confirmed');
             const newStatus = allConfirmed ? 'confirmed' : 'cancelled';
             await updateDoc(doc(db, 'teachers', tid, 'orders', orderId), { status: newStatus, courses: order.courses });
