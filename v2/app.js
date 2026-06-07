@@ -456,10 +456,11 @@ function renderList() {
     const card = document.createElement('div');
     card.className = 'course-card' + (isFull ? ' full' : '');
     card.innerHTML = `
+      ${statusTag ? `<div class="card-status-tag">${statusTag}</div>` : ''}
       <div class="card-dot ${dotClass}"></div>
       <div class="card-body">
         <div class="card-date">${c.date} ${c.time}</div>
-        <div class="card-title">${c.title} ${statusTag}</div>
+        <div class="card-title">${c.title}</div>
         <div class="card-location">📍 ${c.location}</div>
         ${isAdmin() ? `<div style="display:flex;gap:6px;margin-top:4px"><button class="edit-toggle-btn" id="cardEditBtn_${c.id}">✏️ 編輯</button><button class="edit-toggle-btn" id="ccopy_${c.id}">📋 複製</button><button class="edit-toggle-btn" id="cdelete_${c.id}">🗑️ 刪除</button></div>` : ''}
       </div>
@@ -794,6 +795,8 @@ function renderDayDetail(dateStr, dayCourses) {
     const isFull = state === 'closed' || state === 'full';
     const dotColor = state === 'open' ? 'var(--rose)' : state === 'pending' ? 'var(--gold)' : '#ccc';
     const spotsText = state === 'closed' ? '已關閉' : state === 'full' ? '已滿班' : state === 'pending' ? `待開班・餘 ${remaining} 位` : `餘 ${remaining} 位`;
+    const dciTag = (!isAdmin() && isEnrolled(c.id)) ? '<span class="tag-enrolled">✓ 已報名</span>'
+                 : (!isAdmin() && hasPendingOrder(c.id)) ? '<span class="tag-pending">⏳ 審核中</span>' : '';
 
     html += `
       <div class="day-course-item ${isFull ? 'is-full' : ''}" data-id="${c.id}">
@@ -803,7 +806,7 @@ function renderDayDetail(dateStr, dayCourses) {
           <div class="dci-name">${c.title}</div>
           <div class="dci-loc">📍 ${c.location}</div>
         </div>
-        <div class="dci-spots">${spotsText}</div>
+        <div class="dci-spots">${spotsText}${dciTag ? `<br>${dciTag}` : ''}</div>
       </div>`;
   });
   html += '</div>';
