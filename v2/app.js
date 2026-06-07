@@ -2306,6 +2306,7 @@ function renderHomeSections() {
           teacherName = adminSnap.data().name || null;
           updateTeacherBtn();
           await loadFromStorage();
+          openAdmin();
           return;
         }
       } catch(e) {}
