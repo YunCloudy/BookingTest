@@ -947,7 +947,7 @@ function bindModalRosterEvents(course) {
 
       const results = [...seen.values()];
       if (results.length === 0) {
-        dropdown.innerHTML = `<div class="modal-search-hint">找不到此學生的報名紀錄，將以佔位方式新增（不連動帳號）</div>`;
+        dropdown.innerHTML = `<div class="modal-search-hint">找不到此學生的報名紀錄，將以訪客方式新增（不連動帳號）</div>`;
       } else {
         dropdown.innerHTML = results.map(r => `
           <div class="modal-search-item" data-student-id="${r.studentId}" data-student-name="${r.studentName}" data-student-email="${r.studentEmail}" data-last-course="${r.lastCourse}" data-last-date="${r.lastDate}">
@@ -1048,7 +1048,7 @@ function bindModalRosterEvents(course) {
       // ── 純佔位模式：只寫 bookings ──
       bookings[course.id].push({ name, phone, time: now });
       saveToStorage();
-      showToast(`已新增 ${name}（佔位）`);
+      showToast(`已新增 ${name}（訪客）`);
     }
 
     openModal(course);
