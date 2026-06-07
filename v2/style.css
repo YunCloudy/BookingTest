@@ -1460,6 +1460,18 @@ main { padding: 20px 16px 40px; max-width: 680px; margin: 0 auto; }
   gap: 8px;
   margin-top: 10px;
 }
+.order-bulk-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+  align-items: center;
+}
+.order-bulk-actions .order-course-btn-confirm,
+.order-bulk-actions .order-course-btn-cancel {
+  width: auto;
+  padding: 4px 12px;
+  font-size: 0.8rem;
+}
 .order-btn-finish {
   flex: 1;
   padding: 9px;

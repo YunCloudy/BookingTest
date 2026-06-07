@@ -1735,15 +1735,15 @@ function renderAdmin() {
                   <button class="order-course-btn-confirm" data-order-id="${order.id}" data-course-idx="${idx}">✓</button>
                   <button class="order-course-btn-cancel" data-order-id="${order.id}" data-course-idx="${idx}">✕</button>
                 </div>
-              ` : c.result === 'confirmed' ? '<div class="order-course-actions"><button class="order-course-btn-confirm selected" disabled>✓</button><button class="order-course-btn-cancel" disabled>✕</button></div>' : c.result === 'cancelled' ? '<div class="order-course-actions"><button class="order-course-btn-confirm" disabled>✓</button><button class="order-course-btn-cancel selected" disabled>✕</button></div>' : ''}
+              ` : c.result === 'confirmed' ? '<div class="order-course-actions"><button class="order-course-btn-confirm selected" disabled>✓</button></div>' : c.result === 'cancelled' ? '<div class="order-course-actions"><button class="order-course-btn-cancel selected" disabled>✕</button></div>' : ''}
             </div>
           </div>
         `).join('');
 
         const bulkActionHtml = isPending ? `
-          <div class="order-actions">
-            <button class="order-btn-bulk-confirm" data-id="${order.id}">✓ 全部確認</button>
-            <button class="order-btn-bulk-cancel" data-id="${order.id}">✕ 全部取消</button>
+          <div class="order-bulk-actions">
+            <button class="order-course-btn-confirm order-btn-bulk-confirm" data-id="${order.id}">✓ 全部確認</button>
+            <button class="order-course-btn-cancel order-btn-bulk-cancel" data-id="${order.id}">✕ 全部取消</button>
           </div>
           <div class="order-cancel-reason-wrap order-bulk-cancel-reason" style="display:none">
             <div class="order-cancel-reason-label">全部取消原因</div>
