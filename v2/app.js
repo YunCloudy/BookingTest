@@ -464,7 +464,7 @@ function renderList() {
         ${isAdmin() ? `<div style="display:flex;gap:6px;margin-top:4px"><button class="edit-toggle-btn" id="cardEditBtn_${c.id}">✏️ 編輯</button><button class="edit-toggle-btn" id="ccopy_${c.id}">📋 複製</button><button class="edit-toggle-btn" id="cdelete_${c.id}">🗑️ 刪除</button></div>` : ''}
       </div>
       <div class="card-spots">
-        ${statusTag ? `<div class="card-status-tag">${statusTag}</div>` : ''}
+        <div class="card-status-tag">${statusTag}</div>
         <div class="card-spots-num">${spotsHtml}</div>
       </div>
     `;
