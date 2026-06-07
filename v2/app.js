@@ -844,7 +844,7 @@ function renderModalRoster(course) {
           <div>
             <span class="modal-roster-name">${i + 1}. ${b.name}</span>
             ${b.phone ? `<span class="modal-roster-phone">${b.phone}</span>` : ''}
-            ${b.studentId ? '<span class="modal-roster-linked">已綁定</span>' : ''}
+            ${b.studentId ? '<span class="modal-roster-linked">已登入</span>' : '<span class="modal-roster-guest">訪客</span>'}
           </div>
           <button class="modal-delete-btn" data-index="${i}" data-student-id="${b.studentId || ''}" data-order-id="${b.orderId || ''}">🗑</button>
         </div>`).join('');

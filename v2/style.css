@@ -1674,3 +1674,15 @@ main { padding: 20px 16px 40px; max-width: 680px; margin: 0 auto; }
   margin-left: 6px;
   vertical-align: middle;
 }
+
+.modal-roster-guest {
+  display: inline-block;
+  font-size: 0.7rem;
+  background: none;
+  border: 1px solid #bbb;
+  color: #999;
+  border-radius: 20px;
+  padding: 1px 7px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
