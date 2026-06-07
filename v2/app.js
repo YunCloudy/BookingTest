@@ -808,7 +808,10 @@ function renderDayDetail(dateStr, dayCourses) {
           <div class="dci-name">${c.title}</div>
           <div class="dci-loc">📍 ${c.location}</div>
         </div>
-        <div class="dci-spots">${spotsText}${dciTag ? `<br>${dciTag}` : ''}</div>
+        <div class="dci-spots">
+          <div class="dci-spots-text">${spotsText}</div>
+          ${dciTag ? `<div class="dci-spots-tag">${dciTag}</div>` : ''}
+        </div>
       </div>`;
   });
   html += '</div>';
