@@ -456,7 +456,6 @@ function renderList() {
     const card = document.createElement('div');
     card.className = 'course-card' + (isFull ? ' full' : '');
     card.innerHTML = `
-      ${statusTag ? `<div class="card-status-tag">${statusTag}</div>` : ''}
       <div class="card-dot ${dotClass}"></div>
       <div class="card-body">
         <div class="card-date">${c.date} ${c.time}</div>
@@ -464,7 +463,10 @@ function renderList() {
         <div class="card-location">📍 ${c.location}</div>
         ${isAdmin() ? `<div style="display:flex;gap:6px;margin-top:4px"><button class="edit-toggle-btn" id="cardEditBtn_${c.id}">✏️ 編輯</button><button class="edit-toggle-btn" id="ccopy_${c.id}">📋 複製</button><button class="edit-toggle-btn" id="cdelete_${c.id}">🗑️ 刪除</button></div>` : ''}
       </div>
-      <div class="card-spots">${spotsHtml}</div>
+      <div class="card-spots">
+        ${statusTag ? `<div class="card-status-tag">${statusTag}</div>` : ''}
+        <div class="card-spots-num">${spotsHtml}</div>
+      </div>
     `;
     card.addEventListener('click', (e) => {
       if (e.target.closest('.edit-toggle-btn')) return;
@@ -1400,6 +1402,7 @@ document.getElementById('studentLogoutCancel').addEventListener('click', () => {
 
 document.getElementById('studentLogoutConfirm').addEventListener('click', async () => {
   currentStudent = null;
+  studentOrders = [];
   sessionStorage.removeItem('loginRole');
   updateStudentBtn();
   resetGoogleLoginBtn();
