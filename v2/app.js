@@ -1084,12 +1084,14 @@ function openModal(course) {
       <div class="spots-big ${isFull ? 'zero' : ''}">${isFull ? '✕' : remaining}</div>
       <div class="spots-sub">${isFull ? '本堂已滿班' : isPending ? `待開班・共${course.maxSpots}人` : `剩餘名額（共${course.maxSpots}人）`}</div>
     </div>
-    ${course.showRoster && !isAdmin() ? `
+    ${course.showRoster && !isAdmin() ? (() => {
+  const roster = bookings[course.id] || [];
+  return `
   <div class="modal-roster">
-    <div class="modal-roster-title">已報名學員（${bookings[course.id].length} 人）</div>
-    <div>${bookings[course.id].map((b,i) => `<div class="modal-roster-item"><span class="modal-roster-name">${i+1}. ${b.name}</span></div>`).join('')}</div>
-  </div>
-` : ''}
+    <div class="modal-roster-title">已報名學員（${roster.length} 人）</div>
+    <div>${roster.map((b,i) => `<div class="modal-roster-item"><span class="modal-roster-name">${i+1}. ${b.name}</span></div>`).join('')}</div>
+  </div>`;
+})() : ''}
 ${isAdmin() ? renderModalRoster(course) : (isEnrolled(course.id) ? `
     <div id="cartBtnArea">
       <div class="cart-added-label">已經報名囉！</div>
@@ -1152,15 +1154,35 @@ function removeFromCart(courseId) {
 }
 
 // ── STUDENT ORDERS ──
-async function loadStudentOrders(uid) {
-  try {
-    const snap = await getDocs(
-      query(collection(db, 'users', uid, 'orders'), orderBy('createdAt', 'desc'))
-    );
-    studentOrders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-  } catch(e) {
-    studentOrders = [];
+let studentOrdersUnsubscribe = null;
+
+function loadStudentOrders(uid) {
+  // 先取消上一個監聽（防止重複訂閱）
+  if (studentOrdersUnsubscribe) {
+    studentOrdersUnsubscribe();
+    studentOrdersUnsubscribe = null;
   }
+  return new Promise((resolve) => {
+    let resolved = false;
+    studentOrdersUnsubscribe = onSnapshot(
+      query(collection(db, 'users', uid, 'orders'), orderBy('createdAt', 'desc')),
+      (snap) => {
+        studentOrders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        if (!resolved) {
+          resolved = true;
+          resolve();
+        } else {
+          // 老師更新後自動刷新學生畫面
+          if (currentView === 'calendar') renderCalendar(); else renderList();
+        }
+      },
+      (err) => {
+        console.warn('訂單監聽失敗', err);
+        studentOrders = [];
+        resolve();
+      }
+    );
+  });
 }
 
 // 該課程已有「confirmed」的訂單 → 顯示「已報名」標籤
@@ -1566,6 +1588,7 @@ document.getElementById('studentLogoutCancel').addEventListener('click', () => {
 });
 
 document.getElementById('studentLogoutConfirm').addEventListener('click', async () => {
+  if (studentOrdersUnsubscribe) { studentOrdersUnsubscribe(); studentOrdersUnsubscribe = null; }
   currentStudent = null;
   studentOrders = [];
   sessionStorage.removeItem('loginRole');
@@ -2252,6 +2275,7 @@ function renderHomeSections() {
   // 登入狀態監聽：重整後恢復老師或學生狀態
   onAuthStateChanged(auth, async user => {
     if (!user) {
+      if (studentOrdersUnsubscribe) { studentOrdersUnsubscribe(); studentOrdersUnsubscribe = null; }
       currentStudent = null;
       currentTeacher = null;
       teacherId = null;
