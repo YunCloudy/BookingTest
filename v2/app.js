@@ -32,7 +32,7 @@
 
 // ── FIREBASE ──
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot, collection, getDocs, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot, collection, getDocs, addDoc, serverTimestamp, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 const firebaseConfig = {
@@ -53,6 +53,7 @@ let teacherId = null;        // 動態從 admins/{uid}.teacherId 拿
 let teacherName = null;     // 從 admins/{uid}.name 拿
 let currentTeacher = null;  // Google 登入的老師（Firebase User）
 let currentStudent = null;  // Google 登入的學生
+let studentOrders = [];     // 學生登入後從 users/{uid}/orders/ 撈回來的訂單
 
 // ── CART ──
 const TEACHER_ID_STATIC = 'test_aerial';
@@ -444,6 +445,11 @@ function renderList() {
 
     let spotsHtml = buildSpotsHtml(state, remaining, c.maxSpots);
 
+    // 學生端：已報名 / 審核中 標籤
+    const enrolledTag  = (!isAdmin() && isEnrolled(c.id))    ? '<span class="tag-enrolled">✓ 已報名</span>' : '';
+    const pendingTag   = (!isAdmin() && !isEnrolled(c.id) && hasPendingOrder(c.id)) ? '<span class="tag-pending">⏳ 審核中</span>' : '';
+    const statusTag    = enrolledTag || pendingTag;
+
     const wrapper = document.createElement('div');
     wrapper.className = 'course-card-wrap';
 
@@ -453,7 +459,7 @@ function renderList() {
       <div class="card-dot ${dotClass}"></div>
       <div class="card-body">
         <div class="card-date">${c.date} ${c.time}</div>
-        <div class="card-title">${c.title}</div>
+        <div class="card-title">${c.title} ${statusTag}</div>
         <div class="card-location">📍 ${c.location}</div>
         ${isAdmin() ? `<div style="display:flex;gap:6px;margin-top:4px"><button class="edit-toggle-btn" id="cardEditBtn_${c.id}">✏️ 編輯</button><button class="edit-toggle-btn" id="ccopy_${c.id}">📋 複製</button><button class="edit-toggle-btn" id="cdelete_${c.id}">🗑️ 刪除</button></div>` : ''}
       </div>
@@ -920,9 +926,13 @@ function openModal(course) {
 ` : ''}
 ${isAdmin() ? renderModalRoster(course) : (!isFull ? `
     <div id="cartBtnArea">
-      ${cartHasItem(course.id)
-        ? '<div class="cart-added-label">✓ 已加入購物車</div><button class="btn-cart btn-cart-added" disabled>已在購物車中</button>'
-        : '<button class="btn-cart" id="addToCartBtn">🛒 加入購物車</button>'
+      ${isEnrolled(course.id)
+        ? '<div class="cart-added-label">✓ 已報名此課程</div><button class="btn-cart btn-cart-added" disabled>已報名</button>'
+        : hasPendingOrder(course.id)
+          ? '<div class="cart-added-label">⏳ 訂單審核中</div><button class="btn-cart btn-cart-added" disabled>審核中</button>'
+          : cartHasItem(course.id)
+            ? '<div class="cart-added-label">✓ 已加入購物車</div><button class="btn-cart btn-cart-added" disabled>已在購物車中</button>'
+            : '<button class="btn-cart" id="addToCartBtn">🛒 加入購物車</button>'
       }
     </div>` : `
     <div class="full-notice">本班已額滿，如有需要請向老師詢問候補 🙏</div>
@@ -952,6 +962,14 @@ function cartHasItem(courseId) {
 
 function addToCart(course) {
   if (cartHasItem(course.id)) return;
+  if (isEnrolled(course.id)) {
+    showToast('你已報名此課程');
+    return;
+  }
+  if (hasPendingOrder(course.id)) {
+    showToast('此課程已有待審核的訂單');
+    return;
+  }
   cart.push({ courseId: course.id, title: course.title, date: course.date, time: course.time, price: course.price });
   updateCartBtn();
   showToast(`已加入購物車：${course.title}`);
@@ -961,6 +979,34 @@ function removeFromCart(courseId) {
   cart = cart.filter(item => item.courseId !== courseId);
   updateCartBtn();
   renderCartOverlay();
+}
+
+// ── STUDENT ORDERS ──
+async function loadStudentOrders(uid) {
+  try {
+    const snap = await getDocs(
+      query(collection(db, 'users', uid, 'orders'), orderBy('createdAt', 'desc'))
+    );
+    studentOrders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch(e) {
+    studentOrders = [];
+  }
+}
+
+// 該課程已有「confirmed」的訂單 → 顯示「已報名」標籤
+function isEnrolled(courseId) {
+  return studentOrders.some(o =>
+    o.status === 'confirmed' &&
+    o.courses?.some(c => c.courseId === courseId)
+  );
+}
+
+// 該課程有「pending」的訂單 → 顯示「審核中」標籤，同時擋重複加入
+function hasPendingOrder(courseId) {
+  return studentOrders.some(o =>
+    o.status === 'pending' &&
+    o.courses?.some(c => c.courseId === courseId)
+  );
 }
 
 function updateCartBtn() {
@@ -1072,6 +1118,13 @@ async function submitOrder() {
 
   try {
     await setDoc(doc(db, 'teachers', tid, 'orders', orderId), orderData);
+    // 同時寫入學生端，方便學生查詢自己的訂單與審核結果
+    await setDoc(doc(db, 'users', currentStudent.uid, 'orders', orderId), {
+      ...orderData,
+      teacherId: tid
+    });
+    // 更新本地 studentOrders（加在最前面，因為是最新的）
+    studentOrders.unshift({ id: orderId, ...orderData, teacherId: tid });
     cart = [];
     updateCartBtn();
     btn.textContent = '送出訂單';
@@ -1288,6 +1341,9 @@ document.getElementById('googleLoginBtn').addEventListener('click', () => {
     } catch(e) {
       updateStudentBtn();
     }
+    // 撈學生訂單，才能顯示「已報名」標籤和擋重複報名
+    await loadStudentOrders(user.uid);
+    if (currentView === 'calendar') renderCalendar(); else renderList();
     btn.innerHTML = GOOGLE_BTN_INNER;
     btn.disabled = false;
     showToast('登入成功！');
@@ -1927,6 +1983,15 @@ function renderAdmin() {
             const allConfirmed = order.courses.every(c => c.result === 'confirmed');
             const newStatus = allConfirmed ? 'confirmed' : 'cancelled';
             await updateDoc(doc(db, 'teachers', tid, 'orders', orderId), { status: newStatus, courses: order.courses });
+            // 同步更新學生端訂單狀態與各堂課結果
+            try {
+              await updateDoc(doc(db, 'users', order.studentId, 'orders', orderId), {
+                status: newStatus,
+                courses: order.courses
+              });
+            } catch(syncErr) {
+              console.warn('學生端同步失敗（不影響老師端）', syncErr);
+            }
             // 更新 bookings（只加確認的）
             for (const c of order.courses) {
               if (c.result !== 'confirmed') continue;
@@ -1960,6 +2025,15 @@ function renderAdmin() {
             const tid = teacherId || TEACHER_ID_STATIC;
             order.courses = order.courses.map(c => ({ ...c, result: 'cancelled' }));
             await updateDoc(doc(db, 'teachers', tid, 'orders', orderId), { status: 'cancelled', courses: order.courses });
+            // 同步更新學生端
+            try {
+              await updateDoc(doc(db, 'users', order.studentId, 'orders', orderId), {
+                status: 'cancelled',
+                courses: order.courses
+              });
+            } catch(syncErr) {
+              console.warn('學生端同步失敗（不影響老師端）', syncErr);
+            }
             order.status = 'cancelled';
             showToast(`已取消 ${order.studentName} 的訂單`);
             renderOrderSection();
@@ -1997,9 +2071,10 @@ function renderHomeSections() {
 
 // ── INIT初始化 ──
 (async () => {
-  // 先跑頁面初始化，不等 redirect 結果
-  //setTimeout(() => showToast('v16'), 1000); 外觀看不出來的時候確認當前版本沒有卡快取時使用
+  // 公開資料（課程名額、公告）用固定 teacherId 先撈，不需要等登入
+  teacherId = TEACHER_ID_STATIC;
   await loadFromStorage();
+  teacherId = null; // 撈完還原，等老師登入後才正式設定
   renderCalendar();
   renderHomeSections();
 
@@ -2043,6 +2118,8 @@ function renderHomeSections() {
       } catch(e) {
         updateStudentBtn();
       }
+      await loadStudentOrders(user.uid);
+      if (currentView === 'calendar') renderCalendar(); else renderList();
       updateCartBtn();
       return;
     }
@@ -2055,6 +2132,8 @@ function renderHomeSections() {
     } catch(e) {
       updateStudentBtn();
     }
+    await loadStudentOrders(user.uid);
+    if (currentView === 'calendar') renderCalendar(); else renderList();
     updateCartBtn();
   });
 
