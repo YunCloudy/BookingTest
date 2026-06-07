@@ -464,7 +464,7 @@ function renderList() {
         ${isAdmin() ? `<div style="display:flex;gap:6px;margin-top:4px"><button class="edit-toggle-btn" id="cardEditBtn_${c.id}">✏️ 編輯</button><button class="edit-toggle-btn" id="ccopy_${c.id}">📋 複製</button><button class="edit-toggle-btn" id="cdelete_${c.id}">🗑️ 刪除</button></div>` : ''}
       </div>
       <div class="card-spots">
-        <div class="card-status-tag">${statusTag}</div>
+        ${statusTag ? `<div class="card-status-tag">${statusTag}</div>` : ''}
         <div class="card-spots-num">${spotsHtml}</div>
       </div>
     `;
@@ -810,7 +810,7 @@ function renderDayDetail(dateStr, dayCourses) {
         </div>
         <div class="dci-spots">
           <div class="dci-spots-text">${spotsText}</div>
-          ${dciTag ? `<div class="dci-spots-tag">${dciTag}</div>` : ''}
+          <div class="dci-spots-tag">${dciTag}</div>
         </div>
       </div>`;
   });
