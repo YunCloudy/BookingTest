@@ -1735,7 +1735,7 @@ function renderAdmin() {
                   <button class="order-course-btn-confirm" data-order-id="${order.id}" data-course-idx="${idx}">✓</button>
                   <button class="order-course-btn-cancel" data-order-id="${order.id}" data-course-idx="${idx}">✕</button>
                 </div>
-              ` : c.result === 'confirmed' ? '<span class="order-course-tag tag-confirmed">✓</span>' : c.result === 'cancelled' ? '<span class="order-course-tag tag-cancelled">✕</span>' : ''}
+              ` : c.result === 'confirmed' ? '<div class="order-course-actions"><button class="order-course-btn-confirm selected" disabled>✓</button><button class="order-course-btn-cancel" disabled>✕</button></div>' : c.result === 'cancelled' ? '<div class="order-course-actions"><button class="order-course-btn-confirm" disabled>✓</button><button class="order-course-btn-cancel selected" disabled>✕</button></div>' : ''}
             </div>
           </div>
         `).join('');
@@ -1752,7 +1752,7 @@ function renderAdmin() {
             </div>
           </div>
           <div class="order-actions" style="margin-top:8px">
-            <button class="order-btn-finish" data-id="${order.id}">審核完成 ✓</button>
+            <button class="order-btn-finish" data-id="${order.id}">審核完成</button>
             <button class="order-btn-cancel" data-id="${order.id}">取消整筆</button>
           </div>
         ` : '';
@@ -1805,13 +1805,23 @@ function renderAdmin() {
         });
       });
 
-      // ── 單堂取消（選理由後本地暫存，標紅）──
+      // ── 單堂取消（選理由後本地暫存；已選中再按切換取消）──
       listWrap.querySelectorAll('.order-course-btn-cancel').forEach(btn => {
         btn.addEventListener('click', () => {
           const orderId = btn.dataset.orderId;
           const idx = parseInt(btn.dataset.courseIdx);
           const card = btn.closest('.admin-card');
           const singleReason = card.querySelector('.order-single-cancel-reason');
+          const order = orders.find(o => o.id === orderId);
+          if (!order) return;
+          // 已選中 → 切換取消
+          if (btn.classList.contains('selected')) {
+            btn.classList.remove('selected');
+            delete order.courses[idx].localResult;
+            delete order.courses[idx].cancelReason;
+            singleReason.style.display = 'none';
+            return;
+          }
           // 開理由選單
           singleReason.style.display = 'block';
           singleReason.dataset.orderId = orderId;
@@ -1930,11 +1940,11 @@ function renderAdmin() {
             await saveToStorage();
             order.status = newStatus;
             if (currentView === 'calendar') renderCalendar(); else renderList();
-            showToast(`審核完成：${order.studentName} ✨`);
+            showToast(`審核完成：${order.studentName}`);
             renderOrderSection();
           } catch(e) {
             showToast('操作失敗，請再試一次');
-            btn.textContent = '審核完成 ✓'; btn.disabled = false;
+            btn.textContent = '審核完成'; btn.disabled = false;
           }
         });
       });
