@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>課程預約</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;600;700&family=Noto+Sans+TC:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- STUDENT VIEW -->
+<div id="studentView">
+  <header>
+    <div>
+      <h1>🌸 課程預約</h1>
+      <div class="subtitle">AERIAL BOOKING</div>
+    </div>
+    <div class="header-btns">
+      <button id="loginBtn">登入 ▾</button>
+      <button id="cartBtn" class="cart-btn">🛒 購物車<span id="cartCount" class="cart-badge" style="display:none"></span></button>
+    </div>
+  </header>
+
+  <div class="tabs">
+   <div class="tab active" data-view="calendar">本月課表</div>
+    <div class="tab" data-view="list" data-cat="all">全部課程</div>
+    <div class="tab" data-view="list" data-cat="pilates">皮拉提斯</div>
+    <div class="tab" data-view="list" data-cat="aerial">空中瑜珈</div>
+    <div class="tab" data-view="list" data-cat="circus">旋轉課</div>
+  </div>
+
+  <main>
+    <div class="notice" id="globalNoticeWrap">
+      <div id="globalNoticeTitle" style="font-weight:700;margin-bottom:4px;">🗓 下月報名開放時間</div>
+      <div id="globalNoticeBody">6月課程報名將於 5/25（日）22:00 開放，記得設鬧鐘哦！</div>
+    </div>
+
+    <!-- LIST VIEW -->
+    <div id="listView" style="display:none"></div>
+
+    <!-- CALENDAR VIEW -->
+    <div id="calendarView">
+      <div class="calendar-wrap">
+        <div class="cal-nav">
+          <button id="calPrev">‹</button>
+          <h3 id="calTitle"></h3>
+          <button id="calNext">›</button>
+        </div>
+        <div class="cal-grid" id="calGrid"></div>
+      </div>
+      <div id="dayDetail"></div>
+      <div id="noticeRules" class="notice-rules"></div>
+      <div id="sectionAbout" class="notice-rules"></div>
+      <div id="sectionBooking" class="notice-rules"></div>
+      <div id="sectionCourseIntro" class="notice-rules"></div>
+    </div>
+  </main>
+</div>
+
+<!-- LOGIN MODAL -->
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-box">
+    <div style="font-size:2rem;margin-bottom:8px">💮</div>
+    <h3>老師登入</h3>
+    <p>使用 Google 帳號登入</p>
+    <button class="btn-google" id="teacherGoogleLoginBtn">
+      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="18" style="vertical-align:middle;margin-right:8px">
+      以 Google 登入
+    </button>
+    <p>請登入以使用後台</p>
+    <div class="login-error" id="loginError"></div>
+    <button class="login-cancel" id="loginCancel">取消</button>
+  </div>
+</div>
+
+<!-- STUDENT LOGIN MODAL -->
+<div class="login-overlay" id="studentLoginOverlay">
+  <div class="login-box">
+    <div style="font-size:2rem;margin-bottom:8px">🌸</div>
+    <h3>學生登入</h3>
+    <p>使用 Google 帳號登入</p>
+    <button class="btn-google" id="googleLoginBtn">
+      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="18" style="vertical-align:middle;margin-right:8px">
+      以 Google 登入
+    </button>
+    <p>請登入以送出訂單</p>
+    <div class="login-error" id="studentLoginError"></div>
+    <button class="login-cancel" id="studentLoginCancel">取消</button>
+  </div>
+</div>
+
+<!-- LOGIN DROPDOWN（未登入） -->
+<div class="student-dropdown" id="loginDropdown">
+  <button class="student-dropdown-item" id="teacherLoginDropBtn">💮 老師登入</button>
+  <button class="student-dropdown-item" id="studentLoginDropBtn">🌸 學生登入</button>
+</div>
+
+<!-- TEACHER DROPDOWN（老師登入後） -->
+<div class="student-dropdown" id="teacherDropdown">
+  <button class="student-dropdown-item" id="teacherLogoutBtn">🚪 登出</button>
+</div>
+
+<!-- TEACHER LOGOUT CONFIRM -->
+<div class="login-overlay" id="teacherLogoutOverlay">
+  <div class="login-box">
+    <div style="font-size:2rem;margin-bottom:8px">👋</div>
+    <h3 id="teacherLogoutName">登出</h3>
+    <p>確定要登出嗎？</p>
+    <button class="btn-primary" id="teacherLogoutConfirm" style="width:100%">登出</button>
+    <br>
+    <button class="login-cancel" id="teacherLogoutCancel">取消</button>
+  </div>
+</div>
+
+<!-- STUDENT DROPDOWN MENU -->
+<div class="student-dropdown" id="studentDropdown">
+  <button class="student-dropdown-item" id="studentProfileBtn">👤 個人資料</button>
+  <button class="student-dropdown-item" id="studentLogoutBtn">🚪 登出</button>
+</div>
+
+<!-- STUDENT LOGOUT CONFIRM -->
+<div class="login-overlay" id="studentLogoutOverlay">
+  <div class="login-box">
+    <div style="font-size:2rem;margin-bottom:8px">👋</div>
+    <h3 id="studentLogoutName">登出</h3>
+    <p>確定要登出嗎？</p>
+    <button class="btn-primary" id="studentLogoutConfirm" style="width:100%">登出</button>
+    <br>
+    <button class="login-cancel" id="studentLogoutCancel">取消</button>
+  </div>
+</div>
+
+<!-- STUDENT PROFILE OVERLAY -->
+<div class="login-overlay" id="studentProfileOverlay">
+  <div class="login-box">
+    <div style="font-size:2rem;margin-bottom:8px">👤</div>
+    <h3>個人資料</h3>
+    <p id="studentProfileEmail" style="font-size:0.78rem;color:#999;margin-bottom:16px"></p>
+    <div style="text-align:left;margin-bottom:6px;font-size:0.82rem;color:#7a6560">暱稱</div>
+    <input type="text" id="studentNicknameInput" placeholder="輸入暱稱" maxlength="20" style="margin-bottom:12px">
+    <button class="btn-primary" id="studentProfileSave" style="width:100%">儲存</button>
+    <br>
+    <button class="login-cancel" id="studentProfileCancel">取消</button>
+  </div>
+</div>
+
+<!-- TOAST 通知 -->
+<div id="toastNotice" class="toast-notice"></div>
+
+<!-- ADMIN PANEL -->
+
+<div id="adminPanel">
+  <div class="admin-header">
+    <h2>🌸 老師管理後台</h2>
+    <button id="closeAdmin">← 返回</button>
+  </div>
+  <div class="admin-body" id="adminBody"></div>
+</div>
+
+<!-- MODAL -->
+<div class="overlay" id="overlay">
+  <div class="modal" id="modal">
+    <div class="modal-handle"></div>
+    <div id="modalContent"></div>
+  </div>
+</div>
+<!-- 登入成功畫面 -->
+<div id="loginSuccess">
+  <div class="login-success-icon">✨</div>
+  <div class="login-success-title" id="loginSuccessName">歡迎回來！</div>
+  <div class="login-success-sub">正在進入管理後台…</div>
+</div>
+
+
+<!-- CART OVERLAY -->
+<div class="login-overlay" id="cartOverlay">
+  <div class="login-box cart-box">
+    <div style="font-size:2rem;margin-bottom:4px">🛒</div>
+    <h3>購物車</h3>
+    <div id="cartItems"></div>
+    <div id="cartCheckoutForm" style="display:none">
+      <div class="cart-divider"></div>
+      <div class="cart-field-label">你的名稱</div>
+      <input type="text" id="cartName" placeholder="輸入姓名" maxlength="20">
+      <div class="cart-field-label">聯絡電話（選填）</div>
+      <input type="tel" id="cartPhone" placeholder="輸入電話" maxlength="15">
+      <button class="btn-primary" id="cartSubmitBtn" style="width:100%;margin-top:8px">送出訂單</button>
+    </div>
+    <div id="cartLoginPrompt" style="display:none">
+      <div class="cart-divider"></div>
+      <button class="btn-primary" id="cartLoginBtn" style="width:100%">登入以送出訂單</button>
+    </div>
+    <button class="login-cancel" id="cartCloseBtn">關閉</button>
+  </div>
+</div>
+
+<!-- Firebase CDN -->
+<!-- ⚠️ TODO：待 Google 登入完成後，app.js 內的 teacherId 需改為動態讀取 uid -->
+<script type="module" src="app.js"></script>
+</body>
+</html>
