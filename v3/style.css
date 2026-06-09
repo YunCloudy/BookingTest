@@ -1505,28 +1505,28 @@ main { padding: 20px 16px 40px; max-width: 680px; margin: 0 auto; }
   gap: 8px;
   margin: 10px 0 4px;
   padding: 8px 10px;
-  background: var(--bg-soft, #f9f5f3);
+  background: rgba(0,0,0,0.15);
   border-radius: 8px;
 }
 .order-amount-label {
   font-size: 0.82rem;
-  color: #888;
+  color: var(--latte-light);
   flex-shrink: 0;
 }
 .order-amount-wrap {
   display: flex;
   align-items: center;
   font-size: 0.95rem;
-  color: #5a3e3a;
+  color: var(--oat);
   font-weight: 500;
 }
 .order-amount-input {
   width: 80px;
   border: none;
-  border-bottom: 1px solid #c9a99a;
+  border-bottom: 1px solid var(--latte);
   background: transparent;
   font-size: 0.95rem;
-  color: #5a3e3a;
+  color: var(--oat);
   font-weight: 500;
   text-align: right;
   padding: 0 2px;
@@ -1537,17 +1537,17 @@ main { padding: 20px 16px 40px; max-width: 680px; margin: 0 auto; }
   flex-shrink: 0;
   padding: 4px 12px;
   border-radius: 20px;
-  border: 1px solid #bbb;
+  border: 1px solid var(--latte);
   background: transparent;
-  color: #999;
+  color: var(--latte-light);
   font-size: 0.78rem;
   cursor: pointer;
   transition: all 0.2s;
 }
 .order-paid-btn.paid {
   border-color: #7cb87e;
-  color: #5a9e5c;
-  background: #f0faf0;
+  color: #a8d8aa;
+  background: rgba(124,184,126,0.15);
 }
 .order-btn-confirm {
   flex: 1;
@@ -1719,6 +1719,17 @@ main { padding: 20px 16px 40px; max-width: 680px; margin: 0 auto; }
   background: none;
   border: 1px solid #7cb87e;
   color: #5a9e5c;
+  border-radius: 20px;
+  padding: 1px 7px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+.modal-roster-guest {
+  display: inline-block;
+  font-size: 0.7rem;
+  background: none;
+  border: 1px solid #bbb;
+  color: #999;
   border-radius: 20px;
   padding: 1px 7px;
   margin-left: 6px;
