@@ -503,21 +503,11 @@ function renderList() {
           </div>
           <div class="cei-row">
             <span class="cei-label">價格</span>
+            <input type="number" class="cei-input" id="cprice_${c.id}" value="${c.price}">
             <div class="toggle-row" style="margin-left:8px">
               <span class="toggle-label" id="showPriceLabel_${c.id}">${c.showPrice !== false ? '顯示價格' : '隱藏價格'}</span>
               <label class="toggle">
                 <input type="checkbox" id="showPriceToggle_${c.id}" ${c.showPrice !== false ? 'checked' : ''}>
-                <span class="toggle-slider"></span>
-              </label>
-            </div>
-            <input type="number" class="cei-input" id="cprice_${c.id}" value="${c.price}">
-          </div>
-          <div class="cei-row">
-            <span class="cei-label">需先付款</span>
-            <div class="toggle-row" style="margin-left:8px">
-              <span class="toggle-label" id="requirePaymentLabel_${c.id}">${c.requirePayment ? '需要' : '不需要'}</span>
-              <label class="toggle">
-                <input type="checkbox" id="requirePaymentToggle_${c.id}" ${c.requirePayment ? 'checked' : ''}>
                 <span class="toggle-slider"></span>
               </label>
             </div>
@@ -540,6 +530,16 @@ function renderList() {
               <span class="spots-unit cei-spots-gap">滿班人數</span>
               <input type="number" class="spots-input" id="cmaxspots_${c.id}" value="${c.maxSpots}" min="1">
               <span class="spots-unit">人</span>
+            </div>
+          </div>
+          <div class="cei-row">
+            <span class="cei-label">需先付款</span>
+            <div class="toggle-row" style="margin-left:8px">
+              <span class="toggle-label" id="requirePaymentLabel_${c.id}">${c.requirePayment ? '需要' : '不需要'}</span>
+              <label class="toggle">
+                <input type="checkbox" id="requirePaymentToggle_${c.id}" ${c.requirePayment ? 'checked' : ''}>
+                <span class="toggle-slider"></span>
+              </label>
             </div>
           </div>
           <div class="admin-announce cei-textarea-block">
