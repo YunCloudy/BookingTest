@@ -1856,7 +1856,6 @@ function renderAdmin() {
       </div>
       <div class="cei-row">
         <span class="cei-label">價格</span>
-        <input type="number" class="cei-input" id="newPrice" value="500">
         <div class="toggle-row" style="margin-left:auto">
           <span class="toggle-label" id="newShowPriceLabel">隱藏價格</span>
           <label class="toggle">
@@ -1864,10 +1863,11 @@ function renderAdmin() {
             <span class="toggle-slider"></span>
           </label>
         </div>
+        <input type="number" class="cei-input" id="newPrice" value="500">
       </div>
       <div class="cei-row">
         <span class="cei-label">需先付款</span>
-      
+        <div class="toggle-row" style="margin-left:8px">
           <span class="toggle-label" id="newRequirePaymentLabel">不需要</span>
           <label class="toggle">
             <input type="checkbox" id="newRequirePayment">
