@@ -504,10 +504,7 @@ function renderList() {
           <div class="cei-row">
             <span class="cei-label">價格</span>
             <input type="number" class="cei-input" id="cprice_${c.id}" value="${c.price}">
-          </div>
-          <div class="cei-row">
-            <span class="cei-label">顯示價格</span>
-            <div class="toggle-row" style="margin-left:auto">
+            <div class="toggle-row" style="margin-left:8px">
               <span class="toggle-label" id="showPriceLabel_${c.id}">${c.showPrice !== false ? '顯示價格' : '隱藏價格'}</span>
               <label class="toggle">
                 <input type="checkbox" id="showPriceToggle_${c.id}" ${c.showPrice !== false ? 'checked' : ''}>
@@ -537,7 +534,7 @@ function renderList() {
           </div>
           <div class="cei-row">
             <span class="cei-label">需先付款</span>
-            <div class="toggle-row" style="margin-left:auto">
+            <div class="toggle-row" style="margin-left:8px">
               <span class="toggle-label" id="requirePaymentLabel_${c.id}">${c.requirePayment ? '需要' : '不需要'}</span>
               <label class="toggle">
                 <input type="checkbox" id="requirePaymentToggle_${c.id}" ${c.requirePayment ? 'checked' : ''}>
@@ -1751,10 +1748,14 @@ function renderAdmin() {
     courseSection.innerHTML = '';
 
     // 批次隱藏所有課程價格
+    const batchTitle = document.createElement('div');
+    batchTitle.className = 'admin-section-title';
+    batchTitle.textContent = '課程功能設定（批次管理）';
+    courseSection.appendChild(batchTitle);
+
     const batchCard = document.createElement('div');
     batchCard.className = 'admin-card';
     batchCard.innerHTML = `
-      <div class="admin-card-title">⚙️ 批次設定</div>
       <div class="admin-hint">將所有現有課程的「顯示價格」設為隱藏</div>
       <button class="save-announce" id="batchHidePriceBtn">全部隱藏價格</button>
     `;
@@ -1886,7 +1887,7 @@ function renderAdmin() {
       </div>
       <div class="cei-row">
         <span class="cei-label">需先付款</span>
-        <div class="toggle-row" style="margin-left:auto">
+        <div class="toggle-row" style="margin-left:8px">
           <span class="toggle-label" id="newRequirePaymentLabel">不需要</span>
           <label class="toggle">
             <input type="checkbox" id="newRequirePayment">
