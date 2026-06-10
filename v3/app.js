@@ -503,7 +503,6 @@ function renderList() {
           </div>
           <div class="cei-row">
             <span class="cei-label">價格</span>
-            <div class="toggle-row" style="margin-left:8px">
               <span class="toggle-label" id="showPriceLabel_${c.id}">${c.showPrice !== false ? '顯示價格' : '隱藏價格'}</span>
               <label class="toggle">
                 <input type="checkbox" id="showPriceToggle_${c.id}" ${c.showPrice !== false ? 'checked' : ''}>
