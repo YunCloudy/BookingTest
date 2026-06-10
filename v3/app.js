@@ -1857,6 +1857,7 @@ function renderAdmin() {
       <div class="cei-spots-section">
         <div class="cei-spots-header">
          <span class="cei-label">價格</span>
+         <div class="toggle-row">
            <span class="toggle-label" id="newShowPriceLabel">隱藏價格</span>
            <label class="toggle">
              <input type="checkbox" id="newShowPrice">
