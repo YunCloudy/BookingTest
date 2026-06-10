@@ -504,6 +504,9 @@ function renderList() {
           <div class="cei-row">
             <span class="cei-label">價格</span>
             <input type="number" class="cei-input" id="cprice_${c.id}" value="${c.price}">
+          </div>
+          <div class="cei-row">
+            <span class="cei-label">顯示價格</span>
             <div class="toggle-row" style="margin-left:auto">
               <span class="toggle-label" id="showPriceLabel_${c.id}">${c.showPrice !== false ? '顯示價格' : '隱藏價格'}</span>
               <label class="toggle">
@@ -532,21 +535,19 @@ function renderList() {
               <span class="spots-unit">人</span>
             </div>
           </div>
+          <div class="cei-row">
+            <span class="cei-label">需先付款</span>
+            <div class="toggle-row" style="margin-left:auto">
+              <span class="toggle-label" id="requirePaymentLabel_${c.id}">${c.requirePayment ? '需要' : '不需要'}</span>
+              <label class="toggle">
+                <input type="checkbox" id="requirePaymentToggle_${c.id}" ${c.requirePayment ? 'checked' : ''}>
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+          </div>
           <div class="admin-announce cei-textarea-block">
             <div class="admin-announce-label">課程說明</div>
             <textarea id="cdesc_${c.id}" rows="3" placeholder="用於說明課程內容、適合對象等，留空則不顯示">${c.desc}</textarea>
-          </div>
-          <div class="cei-settings-section">
-            <div class="cei-row">
-              <span class="cei-label">需先付款</span>
-              <div class="toggle-row" style="margin-left:auto">
-                <span class="toggle-label" id="requirePaymentLabel_${c.id}">${c.requirePayment ? '需要' : '不需要'}</span>
-                <label class="toggle">
-                  <input type="checkbox" id="requirePaymentToggle_${c.id}" ${c.requirePayment ? 'checked' : ''}>
-                  <span class="toggle-slider"></span>
-                </label>
-              </div>
-            </div>
           </div>
           <div class="admin-announce cei-textarea-block">
             <div class="admin-announce-label">📌 課程備註（小公告）</div>
@@ -1749,6 +1750,24 @@ function renderAdmin() {
   function renderCourseSection() {
     courseSection.innerHTML = '';
 
+    // 批次隱藏所有課程價格
+    const batchCard = document.createElement('div');
+    batchCard.className = 'admin-card';
+    batchCard.innerHTML = `
+      <div class="admin-card-title">⚙️ 批次設定</div>
+      <div class="admin-hint">將所有現有課程的「顯示價格」設為隱藏</div>
+      <button class="save-announce" id="batchHidePriceBtn">全部隱藏價格</button>
+    `;
+    courseSection.appendChild(batchCard);
+    document.getElementById('batchHidePriceBtn').addEventListener('click', async () => {
+      if (!confirm('確定要將所有課程的「顯示價格」設為隱藏嗎？')) return;
+      courses.forEach(c => { c.showPrice = false; });
+      await saveToStorage();
+      if (currentView === 'calendar') renderCalendar(); else renderList();
+      alert('已將所有課程設為隱藏價格！');
+      renderCourseSection();
+    });
+
     // 課程公告
     const midTitle = document.createElement('div');
     midTitle.className = 'admin-section-title';
@@ -1838,9 +1857,9 @@ function renderAdmin() {
         <span class="cei-label">價格</span>
         <input type="number" class="cei-input" id="newPrice" value="500">
         <div class="toggle-row" style="margin-left:auto">
-          <span class="toggle-label" id="newShowPriceLabel">顯示價格</span>
+          <span class="toggle-label" id="newShowPriceLabel">隱藏價格</span>
           <label class="toggle">
-            <input type="checkbox" id="newShowPrice" checked>
+            <input type="checkbox" id="newShowPrice">
             <span class="toggle-slider"></span>
           </label>
         </div>
@@ -1865,21 +1884,19 @@ function renderAdmin() {
           <span class="spots-unit">人</span>
         </div>
       </div>
+      <div class="cei-row">
+        <span class="cei-label">需先付款</span>
+        <div class="toggle-row" style="margin-left:auto">
+          <span class="toggle-label" id="newRequirePaymentLabel">不需要</span>
+          <label class="toggle">
+            <input type="checkbox" id="newRequirePayment">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
       <div class="admin-announce cei-textarea-block">
         <div class="admin-announce-label">課程說明</div>
         <textarea id="newDesc" rows="3" placeholder="用於說明課程內容、適合對象等，留空則不顯示"></textarea>
-      </div>
-      <div class="cei-settings-section">
-        <div class="cei-row">
-          <span class="cei-label">需先付款</span>
-          <div class="toggle-row" style="margin-left:auto">
-            <span class="toggle-label" id="newRequirePaymentLabel">不需要</span>
-            <label class="toggle">
-              <input type="checkbox" id="newRequirePayment">
-              <span class="toggle-slider"></span>
-            </label>
-          </div>
-        </div>
       </div>
       <button class="save-announce cei-save-main" id="confirmAddCourse">＋ 新增課程</button>
     `;
