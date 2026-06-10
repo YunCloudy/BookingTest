@@ -501,26 +501,28 @@ function renderList() {
             <div class="admin-announce-label">地點說明</div>
             <textarea id="clocDetail_${c.id}" rows="2" placeholder="例：捷運松江南京站走路3分鐘，留空則不顯示">${c.locationDetail}</textarea>
           </div>
-          <div class="cei-row">
-            <span class="cei-label">價格</span>
-            <div class="toggle-row" style="margin-left:8px">
-              <span class="toggle-label" id="showPriceLabel_${c.id}">${c.showPrice !== false ? '顯示價格' : '隱藏價格'}</span>
-              <label class="toggle">
-                <input type="checkbox" id="showPriceToggle_${c.id}" ${c.showPrice !== false ? 'checked' : ''}>
+          <div class="cei-spots-section">
+            <div class="cei-spots-header">
+             <span class="cei-label">價格</span>
+             <div class="toggle-row">
+               <span class="toggle-label" id="showPriceLabel_${c.id}">${c.showPrice !== false ? '顯示價格' : '隱藏價格'}</span>
+               <label class="toggle">
+                 <input type="checkbox" id="showPriceToggle_${c.id}" ${c.showPrice !== false ? 'checked' : ''}>
+                 <span class="toggle-slider"></span>
+               </label>
+             </div>
+           </div>
+           <input type="number" class="cei-input" id="cprice_${c.id}" value="${c.price}">
+           <div class="cei-spots-header">
+             <span class="cei-label">需先付款</span>
+             <div class="toggle-row">
+               <span class="toggle-label" id="requirePaymentLabel_${c.id}">${c.requirePayment ? '需要' : '不需要'}</span>
+               <label class="toggle">
+                 <input type="checkbox" id="requirePaymentToggle_${c.id}" ${c.requirePayment ? 'checked' : ''}>
                 <span class="toggle-slider"></span>
-              </label>
-            </div>
-            <input type="number" class="cei-input" id="cprice_${c.id}" value="${c.price}">
-          </div>
-          <div class="cei-row">
-            <span class="cei-label">需先付款</span>
-            <div class="toggle-row" style="margin-left:8px">
-              <span class="toggle-label" id="requirePaymentLabel_${c.id}">${c.requirePayment ? '需要' : '不需要'}</span>
-              <label class="toggle">
-                <input type="checkbox" id="requirePaymentToggle_${c.id}" ${c.requirePayment ? 'checked' : ''}>
-                <span class="toggle-slider"></span>
-              </label>
-            </div>
+               </label>
+             </div>
+           </div>
           </div>
           <div class="cei-spots-section">
             <div class="cei-spots-header">
@@ -1747,28 +1749,6 @@ function renderAdmin() {
   function renderCourseSection() {
     courseSection.innerHTML = '';
 
-    // 批次隱藏所有課程價格
-    const batchTitle = document.createElement('div');
-    batchTitle.className = 'admin-section-title';
-    batchTitle.textContent = '課程功能設定（批次管理）';
-    courseSection.appendChild(batchTitle);
-
-    const batchCard = document.createElement('div');
-    batchCard.className = 'admin-card';
-    batchCard.innerHTML = `
-      <div class="admin-hint">將所有現有課程的「顯示價格」設為隱藏</div>
-      <button class="save-announce" id="batchHidePriceBtn">全部隱藏價格</button>
-    `;
-    courseSection.appendChild(batchCard);
-    document.getElementById('batchHidePriceBtn').addEventListener('click', async () => {
-      if (!confirm('確定要將所有課程的「顯示價格」設為隱藏嗎？')) return;
-      courses.forEach(c => { c.showPrice = false; });
-      await saveToStorage();
-      if (currentView === 'calendar') renderCalendar(); else renderList();
-      alert('已將所有課程設為隱藏價格！');
-      renderCourseSection();
-    });
-
     // 課程公告
     const midTitle = document.createElement('div');
     midTitle.className = 'admin-section-title';
@@ -1804,6 +1784,28 @@ function renderAdmin() {
         saveToStorage();
         alert(`已儲存「${cat.label}」課程公告`);
       });
+    });
+
+    // 批次隱藏所有課程價格
+    const batchTitle = document.createElement('div');
+    batchTitle.className = 'admin-section-title';
+    batchTitle.textContent = '課程功能設定（批次管理）';
+    courseSection.appendChild(batchTitle);
+
+    const batchCard = document.createElement('div');
+    batchCard.className = 'admin-card';
+    batchCard.innerHTML = `
+      <div class="admin-hint">將所有現有課程的「顯示價格」設為隱藏</div>
+      <button class="save-announce" id="batchHidePriceBtn">全部隱藏價格</button>
+    `;
+    courseSection.appendChild(batchCard);
+    document.getElementById('batchHidePriceBtn').addEventListener('click', async () => {
+      if (!confirm('確定要將所有課程的「顯示價格」設為隱藏嗎？')) return;
+      courses.forEach(c => { c.showPrice = false; });
+      await saveToStorage();
+      if (currentView === 'calendar') renderCalendar(); else renderList();
+      alert('已將所有課程設為隱藏價格！');
+      renderCourseSection();
     });
 
     // 新增課程
