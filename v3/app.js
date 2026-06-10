@@ -1864,7 +1864,7 @@ function renderAdmin() {
              <span class="toggle-slider"></span>
            </label>
          </div>
-        <div class="cei-spots-row">
+        <div class="cei-row">
         <input type="number" class="cei-input" id="newPrice" value="500">
        </div>
       </div>
