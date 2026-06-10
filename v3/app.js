@@ -1865,6 +1865,16 @@ function renderAdmin() {
           </label>
         </div>
       </div>
+      <div class="cei-row">
+        <span class="cei-label">需先付款</span>
+      
+          <span class="toggle-label" id="newRequirePaymentLabel">不需要</span>
+          <label class="toggle">
+            <input type="checkbox" id="newRequirePayment">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
       <div class="cei-spots-section">
         <div class="cei-spots-header">
           <span class="cei-label">開放報名</span>
@@ -1883,16 +1893,6 @@ function renderAdmin() {
           <span class="spots-unit cei-spots-gap">滿班人數</span>
           <input type="number" class="spots-input" id="newMaxSpots" value="6" min="1">
           <span class="spots-unit">人</span>
-        </div>
-      </div>
-      <div class="cei-row">
-        <span class="cei-label">需先付款</span>
-        <div class="toggle-row" style="margin-left:8px">
-          <span class="toggle-label" id="newRequirePaymentLabel">不需要</span>
-          <label class="toggle">
-            <input type="checkbox" id="newRequirePayment">
-            <span class="toggle-slider"></span>
-          </label>
         </div>
       </div>
       <div class="admin-announce cei-textarea-block">
