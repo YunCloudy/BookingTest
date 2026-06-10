@@ -503,7 +503,6 @@ function renderList() {
           </div>
           <div class="cei-row">
             <span class="cei-label">價格</span>
-            <input type="number" class="cei-input" id="cprice_${c.id}" value="${c.price}">
             <div class="toggle-row" style="margin-left:8px">
               <span class="toggle-label" id="showPriceLabel_${c.id}">${c.showPrice !== false ? '顯示價格' : '隱藏價格'}</span>
               <label class="toggle">
@@ -511,6 +510,7 @@ function renderList() {
                 <span class="toggle-slider"></span>
               </label>
             </div>
+            <input type="number" class="cei-input" id="cprice_${c.id}" value="${c.price}">
           </div>
           <div class="cei-spots-section">
             <div class="cei-spots-header">
