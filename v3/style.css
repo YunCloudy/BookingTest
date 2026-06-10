@@ -991,6 +991,14 @@ main { padding: 20px 16px 40px; max-width: 680px; margin: 0 auto; }
   gap: 6px;
   padding: 6px 0 2px;
 }
+.cei-settings-section {
+  border-top: 1px solid rgba(255,255,255,0.08);
+  margin-top: 8px;
+  padding-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
 .cei-spots-header {
   display: flex;
   align-items: center;

@@ -504,6 +504,13 @@ function renderList() {
           <div class="cei-row">
             <span class="cei-label">價格</span>
             <input type="number" class="cei-input" id="cprice_${c.id}" value="${c.price}">
+            <div class="toggle-row" style="margin-left:auto">
+              <span class="toggle-label" id="showPriceLabel_${c.id}">${c.showPrice !== false ? '顯示價格' : '隱藏價格'}</span>
+              <label class="toggle">
+                <input type="checkbox" id="showPriceToggle_${c.id}" ${c.showPrice !== false ? 'checked' : ''}>
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
           </div>
           <div class="cei-spots-section">
             <div class="cei-spots-header">
@@ -528,6 +535,18 @@ function renderList() {
           <div class="admin-announce cei-textarea-block">
             <div class="admin-announce-label">課程說明</div>
             <textarea id="cdesc_${c.id}" rows="3" placeholder="用於說明課程內容、適合對象等，留空則不顯示">${c.desc}</textarea>
+          </div>
+          <div class="cei-settings-section">
+            <div class="cei-row">
+              <span class="cei-label">需先付款</span>
+              <div class="toggle-row" style="margin-left:auto">
+                <span class="toggle-label" id="requirePaymentLabel_${c.id}">${c.requirePayment ? '需要' : '不需要'}</span>
+                <label class="toggle">
+                  <input type="checkbox" id="requirePaymentToggle_${c.id}" ${c.requirePayment ? 'checked' : ''}>
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
           </div>
           <div class="admin-announce cei-textarea-block">
             <div class="admin-announce-label">📌 課程備註（小公告）</div>
@@ -589,6 +608,8 @@ function renderList() {
         c.location = editSection.querySelector(`#cloc_${c.id}`).value.trim();
         c.locationDetail = editSection.querySelector(`#clocDetail_${c.id}`).value.trim();
         c.price = parseInt(editSection.querySelector(`#cprice_${c.id}`).value) || 0;
+        c.showPrice = editSection.querySelector(`#showPriceToggle_${c.id}`).checked;
+        c.requirePayment = editSection.querySelector(`#requirePaymentToggle_${c.id}`).checked;
         const spotsVal = parseInt(editSection.querySelector(`#cspots_${c.id}`).value);
         const maxVal = parseInt(editSection.querySelector(`#cmaxspots_${c.id}`).value);
         if (!isNaN(spotsVal) && spotsVal >= 0) c.minSpots = spotsVal;
@@ -1074,10 +1095,11 @@ function openModal(course) {
       <span>📅 ${course.date} ${course.time}</span>
       <span>📍 ${course.location}・${course.locationDetail}</span>
     </div>
+    ${course.showPrice !== false ? `
     <div class="modal-price">
       <div class="price-label">課程費用</div>
       <div class="price-amount">$${course.price}<span class="price-per-person">/人</span></div>
-    </div>
+    </div>` : ''}
     <div class="modal-desc">${course.desc}</div>
     ${announceHtml}
     <div class="spots-display">
@@ -1815,6 +1837,13 @@ function renderAdmin() {
       <div class="cei-row">
         <span class="cei-label">價格</span>
         <input type="number" class="cei-input" id="newPrice" value="500">
+        <div class="toggle-row" style="margin-left:auto">
+          <span class="toggle-label" id="newShowPriceLabel">顯示價格</span>
+          <label class="toggle">
+            <input type="checkbox" id="newShowPrice" checked>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
       </div>
       <div class="cei-spots-section">
         <div class="cei-spots-header">
@@ -1840,6 +1869,18 @@ function renderAdmin() {
         <div class="admin-announce-label">課程說明</div>
         <textarea id="newDesc" rows="3" placeholder="用於說明課程內容、適合對象等，留空則不顯示"></textarea>
       </div>
+      <div class="cei-settings-section">
+        <div class="cei-row">
+          <span class="cei-label">需先付款</span>
+          <div class="toggle-row" style="margin-left:auto">
+            <span class="toggle-label" id="newRequirePaymentLabel">不需要</span>
+            <label class="toggle">
+              <input type="checkbox" id="newRequirePayment">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+      </div>
       <button class="save-announce cei-save-main" id="confirmAddCourse">＋ 新增課程</button>
     `;
     courseSection.appendChild(addCard);
@@ -1852,6 +1893,12 @@ function renderAdmin() {
 
     document.getElementById('newOpen').addEventListener('change', function() {
       document.getElementById('newOpenLabel').textContent = this.checked ? '開放報名' : '關閉報名';
+    });
+    document.getElementById('newShowPrice').addEventListener('change', function() {
+      document.getElementById('newShowPriceLabel').textContent = this.checked ? '顯示價格' : '隱藏價格';
+    });
+    document.getElementById('newRequirePayment').addEventListener('change', function() {
+      document.getElementById('newRequirePaymentLabel').textContent = this.checked ? '需要' : '不需要';
     });
 
     document.getElementById('confirmAddCourse').addEventListener('click', () => {
@@ -1883,6 +1930,8 @@ function renderAdmin() {
         desc: document.getElementById('newDesc').value.trim(),
         announceSmall: '',
         showRoster: false,
+        showPrice: document.getElementById('newShowPrice').checked,
+        requirePayment: document.getElementById('newRequirePayment').checked,
       };
       courses.push(newCourse);
       bookings[newId] = [];
