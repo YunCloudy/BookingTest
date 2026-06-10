@@ -1854,16 +1854,18 @@ function renderAdmin() {
         <div class="admin-announce-label">地點說明</div>
         <textarea id="newLocDetail" rows="2" placeholder="例：捷運松江南京站走路3分鐘，留空則不顯示"></textarea>
       </div>
-      <div class="cei-row">
-        <span class="cei-label">價格</span>
-        <div class="toggle-row" style="margin-left:auto">
-          <span class="toggle-label" id="newShowPriceLabel">隱藏價格</span>
-          <label class="toggle">
-            <input type="checkbox" id="newShowPrice">
-            <span class="toggle-slider"></span>
-          </label>
-        </div>
+      <div class="cei-spots-section">
+        <div class="cei-spots-header">
+         <span class="cei-label">價格</span>
+           <span class="toggle-label" id="newShowPriceLabel">隱藏價格</span>
+           <label class="toggle">
+             <input type="checkbox" id="newShowPrice">
+             <span class="toggle-slider"></span>
+           </label>
+         </div>
+        <div class="cei-spots-row">
         <input type="number" class="cei-input" id="newPrice" value="500">
+       </div>
       </div>
       <div class="cei-row">
         <span class="cei-label">需先付款</span>
