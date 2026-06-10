@@ -56,7 +56,7 @@ let currentStudent = null;  // Google 登入的學生
 let studentOrders = [];     // 學生登入後從 users/{uid}/orders/ 撈回來的訂單
 
 // ── CART ──
-const TEACHER_ID_STATIC = 'test_aerial';
+const TEACHER_ID_STATIC = 'prod_aerial';
 let cart = []; // [{ courseId, title, date, time, price }]
 
 // ── DATA ──
