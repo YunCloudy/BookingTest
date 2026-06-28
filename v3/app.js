@@ -2112,8 +2112,6 @@ function renderAdmin() {
             <span class="order-amount-label">金額</span>
             <span class="order-amount-wrap">$<input class="order-amount-input" type="number" value="${displayAmount}" min="0" data-id="${order.id}"></span>
             <button class="order-paid-btn ${isPaid ? 'paid' : ''}" data-id="${order.id}">${isPaid ? '✓ 已付款' : '未付款'}</button>
-          </div>
-          <div style="text-align:right;margin-top:4px">
             <button class="order-amount-save-btn" data-id="${order.id}">儲存金額</button>
           </div>
         `;
