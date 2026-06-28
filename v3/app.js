@@ -505,9 +505,9 @@ function renderList() {
             <div class="cei-spots-header">
              <span class="cei-label">價格</span>
              <div class="toggle-row">
-               <span class="toggle-label" id="showPriceLabel_${c.id}">${c.showPrice !== false ? '顯示價格' : '隱藏價格'}</span>
+               <span class="toggle-label" id="showPriceLabel_${c.id}">${c.showPrice === true ? '顯示價格' : '隱藏價格'}</span>
                <label class="toggle">
-                 <input type="checkbox" id="showPriceToggle_${c.id}" ${c.showPrice !== false ? 'checked' : ''}>
+                 <input type="checkbox" id="showPriceToggle_${c.id}" ${c.showPrice === true ? 'checked' : ''}>
                  <span class="toggle-slider"></span>
                </label>
              </div>
@@ -1095,7 +1095,7 @@ function openModal(course) {
       <span>📅 ${course.date} ${course.time}</span>
       <span>📍 ${course.location}・${course.locationDetail}</span>
     </div>
-    ${course.showPrice !== false ? `
+    ${course.showPrice === true ? `
     <div class="modal-price">
       <div class="price-label">課程費用</div>
       <div class="price-amount">$${course.price}<span class="price-per-person">/人</span></div>
@@ -2093,10 +2093,11 @@ function renderAdmin() {
         ` : amountHtml;
 
         card.innerHTML = `
-          <div class="order-header">
+          <div class="order-header order-header-toggle">
             <div class="order-student-name">${order.studentName || '未知學生'}</div>
-            <div class="order-date">${dateStr}</div>
+            <div class="order-date">${dateStr} <span class="order-collapse-arrow">▼</span></div>
           </div>
+          <div class="order-card-body" style="display:none">
           <div class="order-contact">本行文字待定，預計填寫email/手機/line名稱</div>
           ${order.phone ? `<div class="order-phone">📞 ${order.phone}</div>` : ''}
           <div class="order-courses">${coursesHtml}</div>
@@ -2108,7 +2109,16 @@ function renderAdmin() {
             </div>
           </div>
           ${bulkActionHtml}
+          </div>
         `;
+        // 點 header 展開/收合
+        card.querySelector('.order-header-toggle').addEventListener('click', () => {
+          const body = card.querySelector('.order-card-body');
+          const arrow = card.querySelector('.order-collapse-arrow');
+          const isOpen = body.style.display !== 'none';
+          body.style.display = isOpen ? 'none' : 'block';
+          arrow.textContent = isOpen ? '▼' : '▲';
+        });
         listWrap.appendChild(card);
       });
 
@@ -2271,6 +2281,15 @@ function renderAdmin() {
           const allMarked = order.courses.every(c => c.localResult === 'confirmed' || c.localResult === 'cancelled');
           if (!allMarked) {
             showToast('請先對每堂課標記確認或取消');
+            return;
+          }
+          // 若課程需先付款，檢查是否已付款
+          const needsPayment = order.courses.some(c => {
+            const course = courses.find(cs => cs.id === c.courseId);
+            return course && course.requirePayment;
+          });
+          if (needsPayment && !order.paid) {
+            showToast('此課程需先付款，請確認付款狀態');
             return;
           }
           btn.textContent = '儲存中…'; btn.disabled = true;
