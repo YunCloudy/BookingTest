@@ -588,6 +588,12 @@ function renderList() {
         c.open = this.checked;
         document.getElementById(`cardTlabel_${c.id}`).textContent = c.open ? '開放報名' : '關閉報名';
       });
+      editSection.querySelector(`#showPriceToggle_${c.id}`).addEventListener('change', function() {
+        document.getElementById(`showPriceLabel_${c.id}`).textContent = this.checked ? '顯示價格' : '隱藏價格';
+      });
+      editSection.querySelector(`#requirePaymentToggle_${c.id}`).addEventListener('change', function() {
+        document.getElementById(`requirePaymentLabel_${c.id}`).textContent = this.checked ? '需要' : '不需要';
+      });
       editSection.querySelector(`#csaveSmall_${c.id}`).addEventListener('click', () => {
         c.announceSmall = editSection.querySelector(`#csmall_${c.id}`).value.trim();
         saveToStorage();
