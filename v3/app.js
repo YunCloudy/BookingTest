@@ -1801,17 +1801,51 @@ function renderAdmin() {
     const batchCard = document.createElement('div');
     batchCard.className = 'admin-card';
     batchCard.innerHTML = `
-      <div class="admin-hint">將所有現有課程的「顯示價格」設為隱藏</div>
-      <button class="save-announce" id="batchHidePriceBtn">全部隱藏價格</button>
+      <div class="batch-feature-row">
+        <span class="batch-feature-label">顯示價格</span>
+        <div class="batch-feature-btns">
+          <button class="batch-btn" data-feature="showPrice" data-val="true">全部開啟</button>
+          <button class="batch-btn" data-feature="showPrice" data-val="false">全部關閉</button>
+        </div>
+      </div>
+      <div class="batch-feature-row">
+        <span class="batch-feature-label">開放報名</span>
+        <div class="batch-feature-btns">
+          <button class="batch-btn" data-feature="open" data-val="true">全部開啟</button>
+          <button class="batch-btn" data-feature="open" data-val="false">全部關閉</button>
+        </div>
+      </div>
+      <div class="batch-feature-row">
+        <span class="batch-feature-label">需先付款</span>
+        <div class="batch-feature-btns">
+          <button class="batch-btn" data-feature="requirePayment" data-val="true">全部開啟</button>
+          <button class="batch-btn" data-feature="requirePayment" data-val="false">全部關閉</button>
+        </div>
+      </div>
+      <div class="batch-feature-row">
+        <span class="batch-feature-label">顯示學員名單</span>
+        <div class="batch-feature-btns">
+          <button class="batch-btn" data-feature="showRoster" data-val="true">全部開啟</button>
+          <button class="batch-btn" data-feature="showRoster" data-val="false">全部關閉</button>
+        </div>
+      </div>
     `;
     courseSection.appendChild(batchCard);
-    document.getElementById('batchHidePriceBtn').addEventListener('click', async () => {
-      if (!confirm('確定要將所有課程的「顯示價格」設為隱藏嗎？')) return;
-      courses.forEach(c => { c.showPrice = false; });
-      await saveToStorage();
-      if (currentView === 'calendar') renderCalendar(); else renderList();
-      alert('已將所有課程設為隱藏價格！');
-      renderCourseSection();
+
+    const featureLabels = { showPrice: '顯示價格', open: '開放報名', requirePayment: '需先付款', showRoster: '顯示學員名單' };
+    batchCard.querySelectorAll('.batch-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const feature = btn.dataset.feature;
+        const val = btn.dataset.val === 'true';
+        const label = featureLabels[feature];
+        const action = val ? '全部開啟' : '全部關閉';
+        if (!confirm(`確定要將所有課程的「${label}」${action}嗎？`)) return;
+        courses.forEach(c => { c[feature] = val; });
+        await saveToStorage();
+        if (currentView === 'calendar') renderCalendar(); else renderList();
+        showToast(`已將所有課程的「${label}」${action}`);
+        renderCourseSection();
+      });
     });
 
     // 新增課程
@@ -2069,7 +2103,8 @@ function renderAdmin() {
 
         // 自動加總金額
         const autoAmount = (order.courses || []).reduce((sum, c) => sum + (c.price || 0), 0);
-        const displayAmount = order.amount != null ? order.amount : autoAmount;
+        const savedAmount = localStorage.getItem(`amount_draft_${order.id}`);
+        const displayAmount = savedAmount != null ? savedAmount : (order.amount != null ? order.amount : autoAmount);
         const isPaid = order.paid === true;
 
         const amountHtml = `
@@ -2077,6 +2112,9 @@ function renderAdmin() {
             <span class="order-amount-label">金額</span>
             <span class="order-amount-wrap">$<input class="order-amount-input" type="number" value="${displayAmount}" min="0" data-id="${order.id}"></span>
             <button class="order-paid-btn ${isPaid ? 'paid' : ''}" data-id="${order.id}">${isPaid ? '✓ 已付款' : '未付款'}</button>
+          </div>
+          <div style="text-align:right;margin-top:4px">
+            <button class="order-amount-save-btn" data-id="${order.id}">儲存金額</button>
           </div>
         `;
 
@@ -2274,6 +2312,35 @@ function renderAdmin() {
           } catch(e) {
             console.warn('付款狀態儲存失敗', e);
           }
+        });
+      });
+
+      // ── 金額輸入暫存到 localStorage ──
+      listWrap.querySelectorAll('.order-amount-input').forEach(input => {
+        input.addEventListener('input', () => {
+          localStorage.setItem(`amount_draft_${input.dataset.id}`, input.value);
+        });
+      });
+
+      // ── 儲存金額（寫入 Firestore，清除暫存）──
+      listWrap.querySelectorAll('.order-amount-save-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const orderId = btn.dataset.id;
+          const order = orders.find(o => o.id === orderId);
+          if (!order) return;
+          const input = listWrap.querySelector(`.order-amount-input[data-id="${orderId}"]`);
+          const finalAmount = Number(input.value);
+          order.amount = finalAmount;
+          btn.textContent = '儲存中…'; btn.disabled = true;
+          try {
+            const tid = teacherId || TEACHER_ID_STATIC;
+            await updateDoc(doc(db, 'teachers', tid, 'orders', orderId), { amount: finalAmount });
+            localStorage.removeItem(`amount_draft_${orderId}`);
+            showToast('金額已儲存');
+          } catch(e) {
+            showToast('儲存失敗，請再試一次');
+          }
+          btn.textContent = '儲存金額'; btn.disabled = false;
         });
       });
 

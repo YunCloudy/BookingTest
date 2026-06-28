@@ -1743,3 +1743,57 @@ main { padding: 20px 16px 40px; max-width: 680px; margin: 0 auto; }
   margin-left: 6px;
   vertical-align: middle;
 }
+
+/* ── 批次功能設定 ── */
+.batch-feature-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+}
+.batch-feature-row:last-child {
+  border-bottom: none;
+}
+.batch-feature-label {
+  font-size: 0.85rem;
+  color: var(--latte-light);
+}
+.batch-feature-btns {
+  display: flex;
+  gap: 6px;
+}
+.batch-btn {
+  padding: 4px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--latte);
+  background: transparent;
+  color: var(--latte-light);
+  font-size: 0.78rem;
+  cursor: pointer;
+  font-family: 'Noto Sans TC', sans-serif;
+  transition: all 0.2s;
+}
+.batch-btn:active {
+  background: var(--rose-dark);
+  border-color: var(--rose-dark);
+  color: var(--white);
+}
+
+/* ── 儲存金額按鈕 ── */
+.order-amount-save-btn {
+  background: transparent;
+  border: 1px solid var(--latte);
+  color: var(--latte-light);
+  padding: 3px 12px;
+  border-radius: 20px;
+  font-size: 0.78rem;
+  cursor: pointer;
+  font-family: 'Noto Sans TC', sans-serif;
+  transition: all 0.2s;
+}
+.order-amount-save-btn:active {
+  background: var(--rose-dark);
+  border-color: var(--rose-dark);
+  color: var(--white);
+}
