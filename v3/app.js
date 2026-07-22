@@ -1304,8 +1304,8 @@ let notifOwnerId = null;
 function courseSummaryText(courses) {
   if (!courses || courses.length === 0) return '';
   const first = courses[0];
-  const base = `${first.title} ${first.date} ${first.time}`;
-  return courses.length > 1 ? `${base} 等時段` : base;
+  const base = `${first.title} ${first.date}${first.time}`;
+  return courses.length > 1 ? `${base}\u3000等時段` : base;
 }
 
 async function pushNotification(pathType, ownerId, { type, message, detail }) {
