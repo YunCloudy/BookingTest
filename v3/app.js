@@ -32,7 +32,7 @@
 
 // ── FIREBASE ──
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot, collection, getDocs, addDoc, serverTimestamp, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot, collection, getDocs, addDoc, serverTimestamp, query, orderBy, limit, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 const firebaseConfig = {
@@ -1295,6 +1295,134 @@ function renderCartOverlay() {
   }
 }
 
+// ── NOTIFICATIONS ──
+let notifItems = [];
+let notifUnsubscribe = null;
+let notifPathType = null; // 'teachers' | 'users'
+let notifOwnerId = null;
+
+function courseSummaryText(courses) {
+  if (!courses || courses.length === 0) return '';
+  const first = courses[0];
+  const base = `${first.title} ${first.date} ${first.time}`;
+  return courses.length > 1 ? `${base} 等時段` : base;
+}
+
+async function pushNotification(pathType, ownerId, { type, message, detail }) {
+  if (!ownerId) return;
+  try {
+    await addDoc(collection(db, pathType, ownerId, 'notifications'), {
+      type,
+      message,
+      detail: detail || '',
+      read: false,
+      createdAt: serverTimestamp()
+    });
+  } catch (e) {
+    console.warn('通知寫入失敗（不影響主要流程）', e);
+  }
+}
+
+function loadNotifications(pathType, ownerId) {
+  if (notifUnsubscribe) { notifUnsubscribe(); notifUnsubscribe = null; }
+  if (!ownerId) return;
+  notifPathType = pathType;
+  notifOwnerId = ownerId;
+  notifUnsubscribe = onSnapshot(
+    query(collection(db, pathType, ownerId, 'notifications'), orderBy('createdAt', 'desc'), limit(30)),
+    (snap) => {
+      notifItems = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      renderNotifDropdown();
+      updateNotifBadge();
+    },
+    (err) => {
+      console.warn('通知讀取失敗', err);
+      notifItems = [];
+      renderNotifDropdown();
+      updateNotifBadge();
+    }
+  );
+}
+
+function clearNotifications() {
+  if (notifUnsubscribe) { notifUnsubscribe(); notifUnsubscribe = null; }
+  notifItems = [];
+  notifPathType = null;
+  notifOwnerId = null;
+  updateNotifBadge();
+  renderNotifDropdown();
+}
+
+function updateNotifBtn() {
+  const btn = document.getElementById('notifBtn');
+  if (!btn) return;
+  btn.style.display = (currentTeacher || currentStudent) ? '' : 'none';
+}
+
+function updateNotifBadge() {
+  const badge = document.getElementById('notifCount');
+  if (!badge) return;
+  const unread = notifItems.filter(n => !n.read).length;
+  if (unread > 0) {
+    badge.textContent = unread > 9 ? '9+' : String(unread);
+    badge.style.display = 'flex';
+  } else {
+    badge.textContent = '';
+    badge.style.display = 'none';
+  }
+}
+
+function formatNotifTime(ts) {
+  if (!ts) return '';
+  const d = ts.toDate ? ts.toDate() : new Date(ts);
+  return d.toLocaleString('zh-TW', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+function renderNotifDropdown() {
+  const list = document.getElementById('notifList');
+  if (!list) return;
+  if (notifItems.length === 0) {
+    list.innerHTML = '<div class="notif-empty">目前沒有通知</div>';
+    return;
+  }
+  list.innerHTML = notifItems.map(n => `
+    <div class="notif-item ${n.read ? '' : 'unread'}">
+      <div class="notif-item-msg">${n.message || ''}</div>
+      ${n.detail ? `<div class="notif-item-detail">${n.detail}</div>` : ''}
+      <div class="notif-item-time">${formatNotifTime(n.createdAt)}</div>
+    </div>
+  `).join('');
+}
+
+async function markAllNotifsRead() {
+  const unread = notifItems.filter(n => !n.read);
+  if (unread.length === 0 || !notifPathType || !notifOwnerId) return;
+  // 先更新本地畫面（立即消紅點），再非同步寫回
+  notifItems = notifItems.map(n => ({ ...n, read: true }));
+  updateNotifBadge();
+  renderNotifDropdown();
+  try {
+    const batch = writeBatch(db);
+    unread.forEach(n => {
+      batch.update(doc(db, notifPathType, notifOwnerId, 'notifications', n.id), { read: true });
+    });
+    await batch.commit();
+  } catch (e) {
+    console.warn('標記已讀失敗', e);
+  }
+}
+
+document.getElementById('notifBtn').addEventListener('click', (e) => {
+  e.stopPropagation();
+  const dd = document.getElementById('notifDropdown');
+  const willOpen = !dd.classList.contains('open');
+  document.getElementById('studentDropdown').classList.remove('open');
+  document.getElementById('teacherDropdown').classList.remove('open');
+  document.getElementById('loginDropdown').classList.remove('open');
+  dd.classList.toggle('open', willOpen);
+  if (willOpen) markAllNotifsRead();
+});
+
 async function submitOrder() {
   // 未登入 → 跳登入，登入後自動重開購物車
   if (!currentStudent) {
@@ -1310,6 +1438,7 @@ async function submitOrder() {
     return;
   }
   const phone = document.getElementById('cartPhone').value.trim();
+  const note = document.getElementById('cartNote').value.trim().slice(0, 100);
   const btn = document.getElementById('cartSubmitBtn');
   btn.textContent = '送出中…';
   btn.disabled = true;
@@ -1331,7 +1460,7 @@ async function submitOrder() {
     })),
     status: 'pending',
     createdAt: new Date().toISOString(),
-    note: '',
+    note,
     amount: null
   };
 
@@ -1341,6 +1470,12 @@ async function submitOrder() {
     await setDoc(doc(db, 'users', currentStudent.uid, 'orders', orderId), {
       ...orderData,
       teacherId: tid
+    });
+    // 通知老師有新訂單申請
+    pushNotification('teachers', tid, {
+      type: 'new_order',
+      message: `您有一筆來自 ${name} 的課程申請`,
+      detail: courseSummaryText(orderData.courses)
     });
     // 更新本地 studentOrders（加在最前面，因為是最新的）
     studentOrders.unshift({ id: orderId, ...orderData, teacherId: tid });
@@ -1395,10 +1530,12 @@ function updateTeacherBtn() {
     loginBtn.textContent = '登入 ▾';
     if (cartBtn) cartBtn.style.display = '';
   }
+  updateNotifBtn();
 }
 
 document.getElementById('loginBtn').addEventListener('click', (e) => {
   e.stopPropagation();
+  document.getElementById('notifDropdown').classList.remove('open');
   if (currentTeacher) {
     const dd = document.getElementById('teacherDropdown');
     dd.classList.toggle('open', !dd.classList.contains('open'));
@@ -1438,6 +1575,7 @@ document.getElementById('teacherLogoutConfirm').addEventListener('click', async 
   teacherId = null;
   teacherName = null;
   sessionStorage.removeItem('loginRole');
+  clearNotifications();
   updateTeacherBtn();
   document.getElementById('teacherLogoutOverlay').classList.remove('open');
   document.getElementById('adminPanel').classList.remove('open');
@@ -1481,6 +1619,7 @@ document.getElementById('teacherGoogleLoginBtn').addEventListener('click', () =>
     btn.disabled = false;
     document.getElementById('loginOverlay').classList.remove('open');
     updateTeacherBtn();
+    loadNotifications('teachers', teacherId);
     await loadFromStorage();
     const splash = document.getElementById('loginSuccess');
     const nameEl = document.getElementById('loginSuccessName');
@@ -1518,6 +1657,7 @@ function updateStudentBtn(nickname) {
   } else if (!currentTeacher) {
     loginBtn.textContent = '登入 ▾';
   }
+  updateNotifBtn();
 }
 
 // 學生按鈕邏輯已合併到 loginBtn
@@ -1527,6 +1667,7 @@ document.addEventListener('click', () => {
   document.getElementById('studentDropdown').classList.remove('open');
   document.getElementById('teacherDropdown').classList.remove('open');
   document.getElementById('loginDropdown').classList.remove('open');
+  document.getElementById('notifDropdown').classList.remove('open');
 });
 
 // 登入
@@ -1552,6 +1693,7 @@ document.getElementById('googleLoginBtn').addEventListener('click', () => {
     }
     currentStudent = user;
     sessionStorage.setItem('loginRole', 'student');
+    loadNotifications('users', user.uid);
     document.getElementById('studentLoginOverlay').classList.remove('open');
     try {
       const snap = await getDoc(doc(db, 'users', user.uid));
@@ -1619,6 +1761,7 @@ document.getElementById('studentLogoutConfirm').addEventListener('click', async 
   currentStudent = null;
   studentOrders = [];
   sessionStorage.removeItem('loginRole');
+  clearNotifications();
   updateStudentBtn();
   resetGoogleLoginBtn();
   document.getElementById('studentLogoutOverlay').classList.remove('open');
@@ -2401,6 +2544,12 @@ function renderAdmin() {
             }
             await saveToStorage();
             order.status = newStatus;
+            // 通知學生審核結果
+            pushNotification('users', order.studentId, {
+              type: 'order_updated',
+              message: '您的課程申請狀態已更新',
+              detail: courseSummaryText(order.courses)
+            });
             if (currentView === 'calendar') renderCalendar(); else renderList();
             showToast(`審核完成：${order.studentName}`);
             renderOrderSection();
@@ -2432,6 +2581,12 @@ function renderAdmin() {
               console.warn('學生端同步失敗（不影響老師端）', syncErr);
             }
             order.status = 'cancelled';
+            // 通知學生訂單已取消
+            pushNotification('users', order.studentId, {
+              type: 'order_updated',
+              message: '您的訂單已取消',
+              detail: courseSummaryText(order.courses)
+            });
             showToast(`已取消 ${order.studentName} 的訂單`);
             renderOrderSection();
           } catch(e) {
@@ -2484,6 +2639,7 @@ function renderHomeSections() {
       teacherId = null;
       teacherName = null;
       studentOrders = [];
+      clearNotifications();
       updateStudentBtn();
       updateTeacherBtn();
       updateCartBtn();
@@ -2503,6 +2659,7 @@ function renderHomeSections() {
           teacherId = adminSnap.data().teacherId;
           teacherName = adminSnap.data().name || null;
           updateTeacherBtn();
+          loadNotifications('teachers', teacherId);
           await loadFromStorage();
           openAdmin();
           return;
@@ -2512,6 +2669,7 @@ function renderHomeSections() {
     if (savedRole === 'student') {
       // 恢復學生狀態
       currentStudent = user;
+      loadNotifications('users', user.uid);
       try {
         const snap = await getDoc(doc(db, 'users', user.uid));
         const nickname = snap.exists() ? snap.data().nickname : null;
@@ -2526,6 +2684,7 @@ function renderHomeSections() {
     }
     // savedRole 不存在（舊 session 或直接訪問）→ 預設當學生
     currentStudent = user;
+    loadNotifications('users', user.uid);
     try {
       const snap = await getDoc(doc(db, 'users', user.uid));
       const nickname = snap.exists() ? snap.data().nickname : null;

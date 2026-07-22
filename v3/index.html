@@ -18,7 +18,8 @@
     </div>
     <div class="header-btns">
       <button id="loginBtn">登入 ▾</button>
-      <button id="cartBtn" class="cart-btn">🛒 購物車<span id="cartCount" class="cart-badge" style="display:none"></span></button>
+      <button id="notifBtn" class="notif-btn" style="display:none">🔔<span id="notifCount" class="notif-badge" style="display:none"></span></button>
+      <button id="cartBtn" class="cart-btn">🛍️ 購物車<span id="cartCount" class="cart-badge" style="display:none"></span></button>
     </div>
   </header>
 
@@ -113,6 +114,14 @@
   </div>
 </div>
 
+<!-- NOTIFICATION DROPDOWN -->
+<div class="student-dropdown notif-dropdown" id="notifDropdown">
+  <div class="notif-dropdown-title">🔔 通知</div>
+  <div class="notif-list" id="notifList">
+    <div class="notif-empty">目前沒有通知</div>
+  </div>
+</div>
+
 <!-- STUDENT DROPDOWN MENU -->
 <div class="student-dropdown" id="studentDropdown">
   <button class="student-dropdown-item" id="studentProfileBtn">👤 個人資料</button>
@@ -185,6 +194,8 @@
       <input type="text" id="cartName" placeholder="輸入姓名" maxlength="20">
       <div class="cart-field-label">聯絡電話（選填）</div>
       <input type="tel" id="cartPhone" placeholder="輸入電話" maxlength="15">
+      <div class="cart-field-label">備註（選填）</div>
+      <textarea id="cartNote" placeholder="補充說明（例如第一次體驗、特殊需求，限100字）" maxlength="100"></textarea>
       <button class="btn-primary" id="cartSubmitBtn" style="width:100%;margin-top:8px">送出訂單</button>
     </div>
     <div id="cartLoginPrompt" style="display:none">
