@@ -1806,6 +1806,12 @@ main { padding: 20px 16px 40px; max-width: 680px; margin: 0 auto; }
   color: var(--latte-light);
   margin-bottom: 6px;
 }
+.credit-current-wrap {
+  margin: 8px 0 4px;
+  padding: 8px 10px;
+  background: rgba(0,0,0,0.15);
+  border-radius: 8px;
+}
 .credit-add-row {
   display: flex;
   align-items: center;
@@ -1866,7 +1872,7 @@ main { padding: 20px 16px 40px; max-width: 680px; margin: 0 auto; }
   font-size: 0.8rem;
   font-family: inherit;
 }
-.credit-manual-delta {
+.credit-manual-total {
   width: 54px;
   border: none;
   border-bottom: 1px solid var(--latte);
