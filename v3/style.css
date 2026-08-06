@@ -1773,6 +1773,137 @@ main { padding: 20px 16px 40px; max-width: 680px; margin: 0 auto; }
   letter-spacing: 0.02em;
 }
 
+/* ── 堂數池 (v3.3) ── */
+.credit-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+.credit-tag {
+  display: inline-block;
+  font-size: 0.72rem;
+  color: var(--oat);
+  background: rgba(255,255,255,0.08);
+  border: 1px solid var(--mocha-light);
+  border-radius: 20px;
+  padding: 2px 10px;
+  white-space: nowrap;
+}
+.credit-tag b { color: var(--rose); font-weight: 700; }
+.credit-tag-empty {
+  color: var(--mocha-light);
+  font-style: italic;
+}
+.credit-add-wrap {
+  margin: 10px 0 4px;
+  padding: 8px 10px;
+  background: rgba(0,0,0,0.15);
+  border-radius: 8px;
+}
+.credit-add-title {
+  font-size: 0.72rem;
+  color: var(--latte-light);
+  margin-bottom: 6px;
+}
+.credit-add-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+}
+.credit-add-label {
+  flex: 1;
+  font-size: 0.82rem;
+  color: var(--oat);
+}
+.credit-add-input {
+  width: 60px;
+  border: none;
+  border-bottom: 1px solid var(--latte);
+  background: transparent;
+  font-size: 0.9rem;
+  color: var(--oat);
+  text-align: right;
+  padding: 0 2px;
+  outline: none;
+}
+.credit-add-unit {
+  font-size: 0.78rem;
+  color: var(--latte-light);
+}
+.credit-manual-wrap {
+  margin-top: 10px;
+}
+.credit-manual-toggle {
+  background: transparent;
+  border: 1px dashed var(--mocha-light);
+  color: var(--latte-light);
+  border-radius: 20px;
+  padding: 5px 12px;
+  font-size: 0.76rem;
+  cursor: pointer;
+  font-family: inherit;
+}
+.credit-manual-toggle:hover { opacity: 0.85; }
+.credit-manual-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 8px 10px;
+  background: rgba(0,0,0,0.15);
+  border-radius: 8px;
+}
+.credit-manual-pool {
+  flex: 1;
+  min-width: 0;
+  background: var(--mocha);
+  color: var(--oat);
+  border: 1px solid var(--mocha-light);
+  border-radius: 6px;
+  padding: 5px 6px;
+  font-size: 0.8rem;
+  font-family: inherit;
+}
+.credit-manual-delta {
+  width: 54px;
+  border: none;
+  border-bottom: 1px solid var(--latte);
+  background: transparent;
+  font-size: 0.9rem;
+  color: var(--oat);
+  text-align: right;
+  padding: 0 2px;
+  outline: none;
+}
+.credit-manual-apply {
+  flex-shrink: 0;
+  border: none;
+  border-radius: 6px;
+  background: var(--rose-dark);
+  color: #fff;
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  font-family: inherit;
+}
+.credit-manual-apply:hover { opacity: 0.85; }
+.credit-manual-apply:disabled { opacity: 0.5; cursor: default; }
+.student-list-search {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--mocha-light);
+  background: rgba(0,0,0,0.15);
+  color: var(--oat);
+  border-radius: 8px;
+  padding: 9px 12px;
+  font-size: 0.88rem;
+  font-family: inherit;
+  outline: none;
+}
+.student-list-search::placeholder { color: var(--latte-light); }
+
 /* ── 手動新增學生：搜尋框 & 下拉 ── */
 .modal-search-wrap {
   position: relative;

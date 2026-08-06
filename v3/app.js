@@ -263,6 +263,80 @@ function teacherDoc(name) {
   return doc(db, 'teachers', teacherId, 'settings', name);
 }
 
+// ══════════════════════════════════════════
+// ── 堂數池 (v3.3) ──
+// Firestore: teachers/{teacherId}/students/{studentId}
+//   name              → 學生姓名（方便老師端不用每次都查訂單）
+//   remainingCredits  → { [poolKey]: 剩餘堂數 }
+// 同步鏡射一份到 users/{studentId}.remainingCredits，供學生端讀取（v3.3 第二階段用）
+// ══════════════════════════════════════════
+
+// 判斷一堂課歸屬哪個堂數池：
+//   空中瑜珈－常態團課：固定 key，彼此互通（不管課程名稱）
+//   其他所有類別（含空瑜許願加開）：用課名本身當 key，需同名稱才互通
+function getPoolKey(course) {
+  if (!course) return '';
+  if (course.cat === 'aerial' && course.subcat === '常態團課') return 'aerial_regular';
+  return course.title || '';
+}
+
+// poolKey 轉成給老師看的顯示文字
+function poolLabel(poolKey) {
+  return poolKey === 'aerial_regular' ? '空瑜常態團課' : poolKey;
+}
+
+// 目前系統中所有課程涵蓋到的 poolKey（供手動調整下拉選單使用）
+function allPoolKeys() {
+  const set = new Set();
+  courses.forEach(c => set.add(getPoolKey(c)));
+  return [...set].filter(Boolean);
+}
+
+function studentDocRef(tid, studentId) {
+  return doc(db, 'teachers', tid, 'students', studentId);
+}
+
+// 讀取單一學生目前的堂數池（不存在則回傳空物件）
+async function getStudentCredits(tid, studentId) {
+  if (!tid || !studentId) return {};
+  try {
+    const snap = await getDoc(studentDocRef(tid, studentId));
+    return snap.exists() ? (snap.data().remainingCredits || {}) : {};
+  } catch (e) {
+    console.warn('讀取學生堂數失敗', e);
+    return {};
+  }
+}
+
+// ── 共用堂數調整函式 ──
+// 學生列表頁、訂單審核頁都呼叫這一個函式，確保資料一致不會兩邊不同步
+// delta 可正可負（正＝新增/退堂，負＝手動扣除）
+async function adjustCredits(tid, studentId, studentName, poolKey, delta) {
+  if (!tid || !studentId || !poolKey || !delta) return null;
+  const ref = studentDocRef(tid, studentId);
+  try {
+    const snap = await getDoc(ref);
+    const existing = snap.exists() ? snap.data() : {};
+    const credits = { ...(existing.remainingCredits || {}) };
+    credits[poolKey] = (credits[poolKey] || 0) + delta;
+    await setDoc(ref, {
+      name: studentName || existing.name || '',
+      remainingCredits: credits,
+      updatedAt: new Date().toISOString()
+    }, { merge: true });
+    // 鏡射一份到 users/{uid}，供學生端讀取
+    try {
+      await setDoc(doc(db, 'users', studentId), { remainingCredits: credits }, { merge: true });
+    } catch (mirrorErr) {
+      console.warn('學生端堂數鏡射失敗（不影響老師端）', mirrorErr);
+    }
+    return credits;
+  } catch (e) {
+    console.warn('堂數調整失敗', e);
+    return null;
+  }
+}
+
 // 儲存所有資料到 Firestore
 async function saveToStorage() {
   if (!teacherId) return;
@@ -1797,6 +1871,7 @@ function renderAdmin() {
     <button class="admin-tab active" data-tab="home">首頁管理</button>
     <button class="admin-tab" data-tab="course">課程管理</button>
     <button class="admin-tab" data-tab="orders">訂單管理</button>
+    <button class="admin-tab" data-tab="students">學生管理</button>
   `;
   body.appendChild(tabBar);
 
@@ -1811,9 +1886,14 @@ function renderAdmin() {
   orderSection.id = 'adminOrderSection';
   orderSection.style.display = 'none';
 
+  const studentSection = document.createElement('div');
+  studentSection.id = 'adminStudentSection';
+  studentSection.style.display = 'none';
+
   body.appendChild(homeSection);
   body.appendChild(courseSection);
   body.appendChild(orderSection);
+  body.appendChild(studentSection);
 
   tabBar.querySelectorAll('.admin-tab').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -1822,6 +1902,7 @@ function renderAdmin() {
       homeSection.style.display = 'none';
       courseSection.style.display = 'none';
       orderSection.style.display = 'none';
+      studentSection.style.display = 'none';
       if (btn.dataset.tab === 'home') {
         homeSection.style.display = 'block';
       } else if (btn.dataset.tab === 'course') {
@@ -1829,6 +1910,9 @@ function renderAdmin() {
       } else if (btn.dataset.tab === 'orders') {
         orderSection.style.display = 'block';
         renderOrderSection();
+      } else if (btn.dataset.tab === 'students') {
+        studentSection.style.display = 'block';
+        renderStudentSection();
       }
     });
   });
@@ -2164,6 +2248,13 @@ function renderAdmin() {
 
     orders.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
 
+    // 撈這批訂單涉及到的所有學生目前剩餘堂數（資料已在記憶體，審核時不用多查一次）
+    const creditsMap = new Map(); // studentId → { [poolKey]: 數量 }
+    const uniqueStudentIds = [...new Set(orders.map(o => o.studentId).filter(Boolean))];
+    await Promise.all(uniqueStudentIds.map(async sid => {
+      creditsMap.set(sid, await getStudentCredits(tid, sid));
+    }));
+
     orderSection.innerHTML = '';
 
     const title = document.createElement('div');
@@ -2226,6 +2317,47 @@ function renderAdmin() {
 
         const isPending = order.status === 'pending';
 
+        // ── 堂數池：這筆訂單涉及的 poolKey，以及該學生目前各池剩餘堂數 ──
+        const studentCredits = creditsMap.get(order.studentId) || {};
+        const orderPoolKeys = [...new Set(
+          (order.courses || []).map(c => getPoolKey(courses.find(cs => cs.id === c.courseId) || { title: c.title }))
+        )].filter(Boolean);
+
+        const creditTagsHtml = order.studentId && orderPoolKeys.length ? `
+          <div class="credit-tags">
+            ${orderPoolKeys.map(pk => `<span class="credit-tag" data-pool="${pk}">${poolLabel(pk)}　剩餘 <b>${studentCredits[pk] || 0}</b> 堂</span>`).join('')}
+          </div>
+        ` : '';
+
+        // ── 審核時「本次新增幾堂」輸入（只有待審核訂單需要）──
+        const creditAddHtml = isPending && order.studentId && orderPoolKeys.length ? `
+          <div class="credit-add-wrap" data-order-id="${order.id}">
+            <div class="credit-add-title">本次新增堂數（審核完成時自動加總，不用手動加總舊堂數）</div>
+            ${orderPoolKeys.map(pk => `
+              <div class="credit-add-row">
+                <span class="credit-add-label">${poolLabel(pk)}</span>
+                <input class="credit-add-input" type="number" value="0" data-pool="${pk}">
+                <span class="credit-add-unit">堂</span>
+              </div>
+            `).join('')}
+          </div>
+        ` : '';
+
+        // ── 手動調整堂數（補堂／修正用，任何時候都能用，不限待審核）──
+        const manualAdjustHtml = order.studentId ? `
+          <div class="credit-manual-wrap" data-student-id="${order.studentId}" data-student-name="${order.studentName || ''}">
+            <button class="credit-manual-toggle" type="button">✎ 手動調整堂數（補堂／修正）</button>
+            <div class="credit-manual-form" style="display:none">
+              <select class="credit-manual-pool">
+                ${allPoolKeys().map(pk => `<option value="${pk}" ${orderPoolKeys[0] === pk ? 'selected' : ''}>${poolLabel(pk)}</option>`).join('')}
+              </select>
+              <input class="credit-manual-delta" type="number" value="1" step="1">
+              <span class="credit-add-unit">堂</span>
+              <button class="credit-manual-apply" type="button">套用</button>
+            </div>
+          </div>
+        ` : '';
+
         const coursesHtml = coursesWithStatus.map((c, idx) => `
           <div class="order-course-item" data-course-idx="${idx}">
             <div class="order-course-left">
@@ -2270,6 +2402,7 @@ function renderAdmin() {
               ${CANCEL_REASONS.map(r => `<button class="order-bulk-reason-btn" data-reason="${r}">${r}</button>`).join('')}
             </div>
           </div>
+          ${creditAddHtml}
           ${amountHtml}
           <div class="order-actions" style="margin-top:8px">
             <button class="order-btn-finish" data-id="${order.id}">審核完成</button>
@@ -2279,7 +2412,10 @@ function renderAdmin() {
 
         card.innerHTML = `
           <div class="order-header order-header-toggle">
-            <div class="order-student-name">${order.studentName || '未知學生'}</div>
+            <div>
+              <div class="order-student-name">${order.studentName || '未知學生'}</div>
+              ${creditTagsHtml}
+            </div>
             <div class="order-date">${dateStr} <span class="order-collapse-arrow">▼</span></div>
           </div>
           <div class="order-card-body" style="display:none">
@@ -2287,6 +2423,7 @@ function renderAdmin() {
           ${order.phone ? `<div class="order-phone">📞 ${order.phone}</div>` : ''}
           <div class="order-courses">${coursesHtml}</div>
           ${order.note ? `<div class="order-note">備註：${order.note}</div>` : ''}
+          ${manualAdjustHtml}
           <div class="order-cancel-reason-wrap order-single-cancel-reason" style="display:none">
             <div class="order-cancel-reason-label">取消原因</div>
             <div class="order-cancel-reason-btns">
@@ -2544,6 +2681,20 @@ function renderAdmin() {
             }
             await saveToStorage();
             order.status = newStatus;
+            // 本次新增堂數：讀取「本次新增幾堂」輸入框，自動加總到對應堂數池
+            if (order.studentId) {
+              const addWrap = listWrap.querySelector(`.credit-add-wrap[data-order-id="${orderId}"]`);
+              if (addWrap) {
+                const addInputs = addWrap.querySelectorAll('.credit-add-input');
+                for (const input of addInputs) {
+                  const delta = Number(input.value);
+                  const poolKey = input.dataset.pool;
+                  if (delta) {
+                    await adjustCredits(tid, order.studentId, order.studentName, poolKey, delta);
+                  }
+                }
+              }
+            }
             // 通知學生審核結果
             pushNotification('users', order.studentId, {
               type: 'order_updated',
@@ -2595,6 +2746,39 @@ function renderAdmin() {
           }
         });
       });
+
+      // ── 手動調整堂數（補堂／修正，學生列表頁共用同一個 adjustCredits 函式）──
+      listWrap.querySelectorAll('.credit-manual-toggle').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const form = btn.nextElementSibling;
+          const isOpen = form.style.display !== 'none';
+          form.style.display = isOpen ? 'none' : 'flex';
+        });
+      });
+      listWrap.querySelectorAll('.credit-manual-apply').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const wrap = btn.closest('.credit-manual-wrap');
+          const studentId = wrap.dataset.studentId;
+          const studentName = wrap.dataset.studentName;
+          const poolKey = wrap.querySelector('.credit-manual-pool').value;
+          const delta = Number(wrap.querySelector('.credit-manual-delta').value);
+          if (!delta) { showToast('請輸入不為 0 的堂數'); return; }
+          btn.textContent = '處理中…'; btn.disabled = true;
+          try {
+            const tid = teacherId || TEACHER_ID_STATIC;
+            const result = await adjustCredits(tid, studentId, studentName, poolKey, delta);
+            if (result) {
+              showToast(`已${delta > 0 ? '新增' : '扣除'} ${poolLabel(poolKey)} ${Math.abs(delta)} 堂`);
+              renderOrderSection();
+            } else {
+              showToast('調整失敗，請再試一次');
+            }
+          } catch(e) {
+            showToast('調整失敗，請再試一次');
+          }
+          btn.textContent = '套用'; btn.disabled = false;
+        });
+      });
     }
 
     filterBar.querySelectorAll('.admin-tab').forEach(btn => {
@@ -2606,6 +2790,144 @@ function renderAdmin() {
     });
 
     renderFilteredOrders('pending');
+  }
+
+  // ── 學生管理（v3.3）：列出每人各堂數池剩餘堂數 ＋ 手動調整入口 ──
+  async function renderStudentSection() {
+    studentSection.innerHTML = '<div class="admin-section-title">學生管理</div><div style="padding:16px;color:#aaa;font-size:0.85rem">載入中…</div>';
+
+    const tid = teacherId || TEACHER_ID_STATIC;
+
+    // 從訂單去重，整理出目前有紀錄的學生名單（與現有「手動新增學生」搜尋邏輯相同做法）
+    let studentList = [];
+    try {
+      const snap = await getDocs(collection(db, 'teachers', tid, 'orders'));
+      const seen = new Map();
+      snap.forEach(d => {
+        const data = d.data();
+        if (!data.studentId || !data.studentName) return;
+        if (!seen.has(data.studentId) || (data.createdAt || '') > (seen.get(data.studentId).createdAt || '')) {
+          seen.set(data.studentId, {
+            studentId: data.studentId,
+            studentName: data.studentName,
+            studentEmail: data.studentEmail || '',
+            createdAt: data.createdAt || ''
+          });
+        }
+      });
+      studentList = [...seen.values()].sort((a, b) => a.studentName.localeCompare(b.studentName, 'zh-Hant'));
+    } catch(e) {
+      studentSection.innerHTML = '<div style="padding:16px;color:#e74c3c">讀取失敗，請重試</div>';
+      return;
+    }
+
+    // 撈每人目前堂數池（資料量不大，直接一次撈完）
+    await Promise.all(studentList.map(async s => {
+      s.remainingCredits = await getStudentCredits(tid, s.studentId);
+    }));
+
+    studentSection.innerHTML = '';
+    const title = document.createElement('div');
+    title.className = 'admin-section-title';
+    title.textContent = '學生管理';
+    studentSection.appendChild(title);
+
+    if (studentList.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'order-empty-hint';
+      empty.textContent = '目前還沒有學生紀錄';
+      studentSection.appendChild(empty);
+      return;
+    }
+
+    const searchWrap = document.createElement('div');
+    searchWrap.style.marginBottom = '12px';
+    searchWrap.innerHTML = `<input type="text" class="student-list-search" placeholder="搜尋學生姓名…">`;
+    studentSection.appendChild(searchWrap);
+
+    const listWrap = document.createElement('div');
+    studentSection.appendChild(listWrap);
+
+    function renderStudentList(keyword) {
+      listWrap.innerHTML = '';
+      const kw = (keyword || '').trim();
+      const filtered = kw ? studentList.filter(s => s.studentName.includes(kw)) : studentList;
+      if (filtered.length === 0) {
+        const hint = document.createElement('div');
+        hint.className = 'order-empty-hint';
+        hint.textContent = '沒有符合的學生';
+        listWrap.appendChild(hint);
+        return;
+      }
+
+      filtered.forEach(s => {
+        const poolEntries = Object.entries(s.remainingCredits || {}).filter(([, v]) => v);
+        const card = document.createElement('div');
+        card.className = 'admin-card';
+        card.style.marginBottom = '10px';
+        card.innerHTML = `
+          <div class="order-header">
+            <div class="order-student-name">${s.studentName}</div>
+            ${s.studentEmail ? `<div class="order-date">${s.studentEmail}</div>` : ''}
+          </div>
+          <div class="credit-tags" style="margin:6px 0">
+            ${poolEntries.length
+              ? poolEntries.map(([pk, v]) => `<span class="credit-tag">${poolLabel(pk)}　剩餘 <b>${v}</b> 堂</span>`).join('')
+              : `<span class="credit-tag credit-tag-empty">尚無堂數</span>`}
+          </div>
+          <div class="credit-manual-wrap" data-student-id="${s.studentId}" data-student-name="${s.studentName}">
+            <button class="credit-manual-toggle" type="button">✎ 調整堂數（補堂／修正）</button>
+            <div class="credit-manual-form" style="display:none">
+              <select class="credit-manual-pool">
+                ${allPoolKeys().map(pk => `<option value="${pk}">${poolLabel(pk)}</option>`).join('')}
+              </select>
+              <input class="credit-manual-delta" type="number" value="1" step="1">
+              <span class="credit-add-unit">堂</span>
+              <button class="credit-manual-apply" type="button">套用</button>
+            </div>
+          </div>
+        `;
+        listWrap.appendChild(card);
+      });
+
+      listWrap.querySelectorAll('.credit-manual-toggle').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const form = btn.nextElementSibling;
+          const isOpen = form.style.display !== 'none';
+          form.style.display = isOpen ? 'none' : 'flex';
+        });
+      });
+      listWrap.querySelectorAll('.credit-manual-apply').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const wrap = btn.closest('.credit-manual-wrap');
+          const studentId = wrap.dataset.studentId;
+          const studentName = wrap.dataset.studentName;
+          const poolKey = wrap.querySelector('.credit-manual-pool').value;
+          const delta = Number(wrap.querySelector('.credit-manual-delta').value);
+          if (!delta) { showToast('請輸入不為 0 的堂數'); return; }
+          btn.textContent = '處理中…'; btn.disabled = true;
+          try {
+            const tid2 = teacherId || TEACHER_ID_STATIC;
+            const result = await adjustCredits(tid2, studentId, studentName, poolKey, delta);
+            if (result) {
+              showToast(`已${delta > 0 ? '新增' : '扣除'} ${poolLabel(poolKey)} ${Math.abs(delta)} 堂`);
+              renderStudentSection();
+            } else {
+              showToast('調整失敗，請再試一次');
+            }
+          } catch(e) {
+            showToast('調整失敗，請再試一次');
+          }
+          btn.textContent = '套用'; btn.disabled = false;
+        });
+      });
+    }
+
+    searchWrap.querySelector('.student-list-search').addEventListener('input', (e) => {
+      renderStudentList(e.target.value);
+    });
+
+    renderStudentList('');
   }
 
   renderHomeSection();
