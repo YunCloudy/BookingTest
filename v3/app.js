@@ -2411,7 +2411,7 @@ function renderAdmin() {
         // 預設空白不是 0：0 也是一個「有意義的輸入」，空白才代表老師還沒填
         const creditAddHtml = isPending && order.studentId && orderPoolKeys.length ? `
           <div class="credit-add-wrap" data-order-id="${order.id}">
-            <div class="credit-add-title">本次新增堂數（審核完成時自動加總，<br>不用手動加總舊堂數）</div>
+            <div class="credit-add-title">本次新增堂數<br>（審核完成時自動加總，不用手動加總舊堂數）</div>
             ${orderPoolKeys.map(pk => {
               const draft = localStorage.getItem(`credit_draft_${order.id}_${pk}`);
               const val = draft != null ? draft : '';
@@ -2431,7 +2431,7 @@ function renderAdmin() {
         const contactHtml = isPending && order.studentId && orderPoolKeys.length ? `
           <div class="order-contact">剩餘堂數</div>
           <div class="credit-tags" style="margin-bottom:8px">
-            ${orderPoolKeys.map(pk => `<span class="credit-tag">${poolLabel(pk)} ${studentCredits[pk] || 0}堂</span>`).join('')}
+            ${orderPoolKeys.map(pk => `<span class="credit-tag">${poolLabel(pk)} <b>${studentCredits[pk] || 0}</b>堂</span>`).join('')}
           </div>
         ` : `<div class="order-contact">本行文字待定，預計填寫email/手機/line名稱</div>`;
 
@@ -2747,7 +2747,7 @@ function renderAdmin() {
           const addWrapCheck = listWrap.querySelector(`.credit-add-wrap[data-order-id="${orderId}"]`);
           if (addWrapCheck) {
             const addInputsCheck = [...addWrapCheck.querySelectorAll('.credit-add-input')];
-            const allEmpty = addInputsCheck.every(inp => inp.value.trim() === '');
+            const allEmpty = addInputsCheck.some(inp => inp.value.trim() === '');
             const hasConfirmed = order.courses.some(c => c.localResult === 'confirmed');
             if (allEmpty && hasConfirmed) {
               const proceed = confirm('本次新增堂數還沒填寫，確定要不新增堂數直接送出審核嗎？');
