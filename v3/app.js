@@ -1241,6 +1241,7 @@ function bindModalRosterEvents(course) {
         courses: [{
           courseId: course.id,
           title: course.title,
+          dateStr: course.dateStr,
           date: course.date,
           time: course.time,
           price: course.price,
@@ -1386,7 +1387,7 @@ function addToCart(course) {
     showToast('此課程已有待審核的訂單');
     return;
   }
-  cart.push({ courseId: course.id, title: course.title, date: course.date, time: course.time, price: course.price });
+  cart.push({ courseId: course.id, dateStr: course.dateStr, date: course.date, time: course.time, title: course.title, price: course.price });
   updateCartBtn();
   showToast(`已加入購物車：${course.title}`);
 }
@@ -1722,6 +1723,7 @@ async function submitOrder() {
     courses: cart.map(item => ({
       courseId: item.courseId,
       title: item.title,
+      dateStr: item.dateStr,
       date: item.date,
       time: item.time,
       price: item.price,
@@ -2425,7 +2427,9 @@ function renderAdmin() {
       const [y, m, d] = dateVal.split('-');
       const dow = new Date(+y, +m-1, +d).getDay();
       const dateLabel = `${+m}/${+d}（${DOW_CHARS[dow]}）`;
-      const newId = Math.max(...courses.map(c => c.id)) + 1;
+      // 用時間戳記當 id，不要用「目前最大值+1」：課程刪除後 id 上限會下降，
+      // 之後新增的課程可能撿到舊課程用過的 id，導致舊訂單/舊請假紀錄的 courseId 意外對應到新課程上
+      const newId = Date.now();
       const newCourse = {
         id: newId,
         cat: document.getElementById('newCat').value,
@@ -3200,9 +3204,9 @@ function renderAdmin() {
           ${isPending ? `
             <div class="leave-expand" style="display:none">
               <div class="credit-add-title">是否增加未使用堂數（系統依截止時間預選，可覆蓋）</div>
-              <div class="order-course-actions" style="margin-bottom:8px">
-                <button type="button" class="order-course-btn-confirm leave-toggle-btn ${defaultIncrease ? 'selected' : ''}" data-value="yes" style="width:auto;padding:4px 14px">是</button>
-                <button type="button" class="order-course-btn-cancel leave-toggle-btn ${!defaultIncrease ? 'selected' : ''}" data-value="no" style="width:auto;padding:4px 14px">否</button>
+              <div class="leave-toggle-group">
+                <button type="button" class="leave-toggle-btn ${defaultIncrease ? 'selected' : ''}" data-value="yes">是</button>
+                <button type="button" class="leave-toggle-btn ${!defaultIncrease ? 'selected' : ''}" data-value="no">否</button>
               </div>
               <div class="credit-add-row">
                 <span class="credit-add-label">堂數異動</span>
