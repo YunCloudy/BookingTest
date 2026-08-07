@@ -1937,6 +1937,87 @@ main { padding: 20px 16px 40px; max-width: 680px; margin: 0 auto; }
 }
 .credit-manual-apply:hover { opacity: 0.85; }
 .credit-manual-apply:disabled { opacity: 0.5; cursor: default; }
+
+/* ── 請假管理（v3.3 第四階段）── */
+.leave-settings-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding: 10px 12px;
+  background: rgba(0,0,0,0.15);
+  border-radius: 8px;
+  flex-wrap: wrap;
+}
+.leave-settings-label {
+  font-size: 0.82rem;
+  color: var(--latte-light);
+}
+.leave-settings-input {
+  width: 60px;
+  border: none;
+  border-bottom: 1px solid var(--latte);
+  background: transparent;
+  font-size: 0.9rem;
+  color: var(--oat);
+  text-align: center;
+  padding: 2px;
+  outline: none;
+}
+.leave-settings-save {
+  margin-left: auto;
+  padding: 5px 14px;
+  border: none;
+  border-radius: 20px;
+  background: var(--rose-dark);
+  color: white;
+  font-size: 0.78rem;
+  cursor: pointer;
+  font-family: inherit;
+}
+.leave-settings-save:hover { opacity: 0.85; }
+.leave-countdown {
+  color: var(--oat-dark);
+  font-weight: 500;
+}
+.leave-expand {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255,255,255,0.1);
+}
+.leave-result-tag {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+.leave-result-tag.refund {
+  background: rgba(124,184,126,0.15);
+  color: #a8d8aa;
+}
+.leave-result-tag.deduct {
+  background: rgba(209,154,90,0.15);
+  color: #e0b884;
+}
+.leave-result-tag.rejected {
+  background: rgba(180,180,180,0.15);
+  color: #bbb;
+}
+/* 課程卡片上「已請假」標籤（老師扣堂確定後，學生端顯示，取代「已報名」）*/
+.tag-leave-done {
+  display: inline-block;
+  background: none;
+  border: 1px solid #b57c3a;
+  color: #b57c3a;
+  border-radius: 20px;
+  padding: 3px 10px;
+  font-size: 0.72rem;
+  font-weight: 400;
+  font-family: 'Noto Sans TC', sans-serif;
+  white-space: nowrap;
+  pointer-events: none;
+}
 .student-list-search {
   width: 100%;
   box-sizing: border-box;

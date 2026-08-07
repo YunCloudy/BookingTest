@@ -347,7 +347,7 @@ async function adjustCredits(tid, studentId, studentName, poolKey, delta) {
   }
 }
 
-// ✍️手動調整堂數（學生管理頁用）：直接把某個 poolKey 設成「總堂數」，不是累加
+// ✍️手動調整未用堂數（學生管理頁用）：直接把某個 poolKey 設成「總堂數」，不是累加
 // 跟 adjustCredits 分開是因為這裡老師想看到、改到的是最終總數，不是要加減幾堂
 async function setCredits(tid, studentId, studentName, poolKey, total) {
   if (!tid || !studentId || !poolKey || total == null || isNaN(total)) return null;
@@ -556,11 +556,12 @@ function renderList() {
 
     let spotsHtml = buildSpotsHtml(state, remaining, c.maxSpots);
 
-    // 學生端：已報名 / 審核中 / 請假申請中 標籤
+    // 學生端：已報名 / 審核中 / 請假申請中 / 已請假 標籤
     const leaveTag     = (!isAdmin() && hasPendingLeave(c.id)) ? '<span class="tag-leave">🙋 請假申請中</span>' : '';
-    const enrolledTag  = (!isAdmin() && !hasPendingLeave(c.id) && isEnrolled(c.id))    ? '<span class="tag-enrolled">✓ 已報名</span>' : '';
+    const leaveDoneTag = (!isAdmin() && !hasPendingLeave(c.id) && hasApprovedDeductLeave(c.id)) ? '<span class="tag-leave-done">🙋 已請假</span>' : '';
+    const enrolledTag  = (!isAdmin() && !hasPendingLeave(c.id) && !hasApprovedDeductLeave(c.id) && isEnrolled(c.id))    ? '<span class="tag-enrolled">✓ 已報名</span>' : '';
     const pendingTag   = (!isAdmin() && !isEnrolled(c.id) && hasPendingOrder(c.id)) ? '<span class="tag-pending">⏳ 審核中</span>' : '';
-    const statusTag    = leaveTag || enrolledTag || pendingTag;
+    const statusTag    = leaveTag || leaveDoneTag || enrolledTag || pendingTag;
 
     const wrapper = document.createElement('div');
     wrapper.className = 'course-card-wrap';
@@ -937,6 +938,7 @@ function renderDayDetail(dateStr, dayCourses) {
     const dotColor = state === 'open' ? 'var(--rose)' : state === 'pending' ? 'var(--gold)' : '#ccc';
     const spotsText = state === 'closed' ? '已關閉' : state === 'full' ? '已滿班' : state === 'pending' ? `待開班・餘 ${remaining} 位` : `餘 ${remaining} 位`;
     const dciTag = (!isAdmin() && hasPendingLeave(c.id)) ? '<span class="tag-leave">🙋 請假申請中</span>'
+                 : (!isAdmin() && hasApprovedDeductLeave(c.id)) ? '<span class="tag-leave-done">🙋 已請假</span>'
                  : (!isAdmin() && isEnrolled(c.id)) ? '<span class="tag-enrolled">✓ 已報名</span>'
                  : (!isAdmin() && hasPendingOrder(c.id)) ? '<span class="tag-pending">⏳ 審核中</span>' : '';
 
@@ -987,7 +989,7 @@ function renderModalRoster(course) {
             ${b.studentId ? '<span class="modal-roster-linked">已登入</span>' : '<span class="modal-roster-guest">訪客</span>'}
           </div>
           <div class="roster-item-actions">
-            ${b.studentId ? `<button class="roster-credit-toggle" type="button" data-idx="${i}" data-student-id="${b.studentId}" data-student-name="${b.name}" title="手動調整堂數">✍️</button>` : ''}
+            ${b.studentId ? `<button class="roster-credit-toggle" type="button" data-idx="${i}" data-student-id="${b.studentId}" data-student-name="${b.name}" title="手動調整未用堂數">✍️</button>` : ''}
             <button class="modal-delete-btn" data-index="${i}" data-student-id="${b.studentId || ''}" data-order-id="${b.orderId || ''}">🗑</button>
           </div>
         </div>
@@ -1049,7 +1051,7 @@ function bindModalRosterEvents(course) {
     });
   });
 
-  // ── ✍️手動調整堂數（每位已登入學員名字旁邊那個小圖示，跟學生管理頁共用同一顆 setCredits）──
+  // ── ✍️手動調整未用堂數（每位已登入學員名字旁邊那個小圖示，跟學生管理頁共用同一顆 setCredits）──
   document.querySelectorAll('.roster-credit-toggle').forEach(btn => {
     btn.addEventListener('click', async () => {
       const idx = btn.dataset.idx;
@@ -1295,6 +1297,10 @@ ${isAdmin() ? renderModalRoster(course) : (hasPendingLeave(course.id) ? `
     <div id="cartBtnArea">
       <div class="cart-added-label">🙋 請假審核中</div>
       <button class="btn-cart btn-cart-added" disabled>等待老師確認</button>
+    </div>` : hasApprovedDeductLeave(course.id) ? `
+    <div id="cartBtnArea">
+      <div class="cart-added-label">🙋 已請假</div>
+      <button class="btn-cart btn-cart-added" disabled>本堂已請假</button>
     </div>` : isEnrolled(course.id) ? `
     <div id="cartBtnArea">
       <div class="cart-added-label">已經報名囉！</div>
@@ -1412,6 +1418,13 @@ function hasPendingOrder(courseId) {
 function hasPendingLeave(courseId) {
   return studentOrders.some(o =>
     o.courses?.some(c => c.courseId === courseId && c.leaveStatus === 'pending')
+  );
+}
+
+// 該課程請假已審核完成、老師選擇「扣堂」→ 卡片顯示「已請假」而不是「已報名」（v3.3 第四階段）
+function hasApprovedDeductLeave(courseId) {
+  return studentOrders.some(o =>
+    o.courses?.some(c => c.courseId === courseId && c.leaveStatus === 'approved_deduct')
   );
 }
 
@@ -2042,6 +2055,7 @@ function renderAdmin() {
     <button class="admin-tab active" data-tab="home">首頁管理</button>
     <button class="admin-tab" data-tab="course">課程管理</button>
     <button class="admin-tab" data-tab="orders">訂單管理</button>
+    <button class="admin-tab" data-tab="leave">請假管理</button>
     <button class="admin-tab" data-tab="students">學生管理</button>
   `;
   body.appendChild(tabBar);
@@ -2057,6 +2071,10 @@ function renderAdmin() {
   orderSection.id = 'adminOrderSection';
   orderSection.style.display = 'none';
 
+  const leaveSection = document.createElement('div');
+  leaveSection.id = 'adminLeaveSection';
+  leaveSection.style.display = 'none';
+
   const studentSection = document.createElement('div');
   studentSection.id = 'adminStudentSection';
   studentSection.style.display = 'none';
@@ -2064,6 +2082,7 @@ function renderAdmin() {
   body.appendChild(homeSection);
   body.appendChild(courseSection);
   body.appendChild(orderSection);
+  body.appendChild(leaveSection);
   body.appendChild(studentSection);
 
   tabBar.querySelectorAll('.admin-tab').forEach(btn => {
@@ -2073,6 +2092,7 @@ function renderAdmin() {
       homeSection.style.display = 'none';
       courseSection.style.display = 'none';
       orderSection.style.display = 'none';
+      leaveSection.style.display = 'none';
       studentSection.style.display = 'none';
       if (btn.dataset.tab === 'home') {
         homeSection.style.display = 'block';
@@ -2081,6 +2101,9 @@ function renderAdmin() {
       } else if (btn.dataset.tab === 'orders') {
         orderSection.style.display = 'block';
         renderOrderSection();
+      } else if (btn.dataset.tab === 'leave') {
+        leaveSection.style.display = 'block';
+        renderLeaveSection();
       } else if (btn.dataset.tab === 'students') {
         studentSection.style.display = 'block';
         renderStudentSection();
@@ -2498,7 +2521,7 @@ function renderAdmin() {
         // 預設空白不是 0：0 也是一個「有意義的輸入」，空白才代表老師還沒填
         const creditAddHtml = isPending && order.studentId && orderPoolKeys.length ? `
           <div class="credit-add-wrap" data-order-id="${order.id}">
-            <div class="credit-add-title">未使用堂數異動<br>（增加請填正數、減少請填負數）<br>（審核完成後自動套用，不用手動計算目前總堂數）</div>
+            <div class="credit-add-title">未使用堂數異動（增加請填正數、減少請填負數）<br>（審核完成後自動套用，不用手動計算目前總堂數）</div>
             ${orderPoolKeys.map(pk => {
               const draft = localStorage.getItem(`credit_draft_${order.id}_${pk}`);
               const val = draft != null ? draft : '';
@@ -2522,13 +2545,13 @@ function renderAdmin() {
           </div>
         ` : `<div class="order-contact">本行文字待定，預計填寫email/手機/line名稱</div>`;
 
-        // ── ✍️手動調整堂數（已審核訂單才顯示，補堂／修正用，跟學生管理頁共用同一顆 setCredits）──
+        // ── ✍️手動調整未用堂數（已審核訂單才顯示，補堂／修正用，跟學生管理頁共用同一顆 setCredits）──
         const manualAdjustHtml = !isPending && order.studentId ? (() => {
           const allKeys = allPoolKeys();
           const firstKey = allKeys[0] || '';
           return `
           <div class="credit-manual-wrap" data-student-id="${order.studentId}" data-student-name="${order.studentName || ''}">
-            <button class="credit-manual-toggle" type="button">✍️手動調整堂數</button>
+            <button class="credit-manual-toggle" type="button">✍️手動調整未用堂數</button>
             <div class="credit-manual-form" style="display:none">
               <select class="credit-manual-pool">
                 ${allKeys.map(pk => `<option value="${pk}" data-current="${studentCredits[pk] || 0}">${poolLabel(pk)}</option>`).join('')}
@@ -2948,7 +2971,7 @@ function renderAdmin() {
         });
       });
 
-      // ── ✍️手動調整堂數（已審核訂單，跟學生管理頁共用同一顆 setCredits）──
+      // ── ✍️手動調整未用堂數（已審核訂單，跟學生管理頁共用同一顆 setCredits）──
       listWrap.querySelectorAll('.credit-manual-toggle').forEach(btn => {
         btn.addEventListener('click', () => {
           const form = btn.nextElementSibling;
@@ -2998,6 +3021,315 @@ function renderAdmin() {
     });
 
     renderFilteredOrders('pending');
+  }
+
+  // ── 請假管理（v3.3 第四階段）──
+  // 資料來源跟訂單管理同一個 collection，但撈的是「訂單裡任一堂課有 leaveStatus」的紀錄，
+  // 攤平成一筆一筆請假申請卡片（一張訂單可能有多堂課分別請假，各自獨立處理）
+  async function renderLeaveSection() {
+    leaveSection.innerHTML = '<div class="admin-section-title">請假管理</div><div style="padding:16px;color:#aaa;font-size:0.85rem">載入中…</div>';
+
+    const tid = teacherId || TEACHER_ID_STATIC;
+
+    // 請假截止時間設定（預設24小時），存在 teachers/{tid}/settings/leaveSettings
+    let deadlineHours = 24;
+    try {
+      const settingsSnap = await getDoc(teacherDoc('leaveSettings'));
+      if (settingsSnap.exists() && settingsSnap.data().deadlineHours != null) {
+        deadlineHours = settingsSnap.data().deadlineHours;
+      }
+    } catch (e) { /* 讀取失敗就用預設值 */ }
+
+    let orders = [];
+    try {
+      const snap = await getDocs(collection(db, 'teachers', tid, 'orders'));
+      snap.forEach(d => orders.push({ id: d.id, ...d.data() }));
+    } catch (e) {
+      leaveSection.innerHTML = '<div style="padding:16px;color:#e74c3c">讀取失敗，請重試</div>';
+      return;
+    }
+
+    // 攤平：每筆訂單裡每一堂課，只要有 leaveStatus 就是一筆請假紀錄
+    const leaveItems = [];
+    orders.forEach(order => {
+      (order.courses || []).forEach((c, idx) => {
+        if (c.leaveStatus && c.leaveStatus !== 'none') {
+          leaveItems.push({ order, courseIdx: idx });
+        }
+      });
+    });
+
+    leaveItems.sort((a, b) =>
+      (b.order.courses[b.courseIdx].leaveRequestedAt || '').localeCompare(a.order.courses[a.courseIdx].leaveRequestedAt || '')
+    );
+
+    leaveSection.innerHTML = '';
+
+    const title = document.createElement('div');
+    title.className = 'admin-section-title';
+    title.textContent = '請假管理';
+    leaveSection.appendChild(title);
+
+    // 請假截止時間設定
+    const settingsWrap = document.createElement('div');
+    settingsWrap.className = 'leave-settings-wrap';
+    settingsWrap.innerHTML = `
+      <span class="leave-settings-label">請假截止時間</span>
+      <input type="number" class="leave-settings-input" id="leaveDeadlineInput" value="${deadlineHours}" min="0">
+      <span class="leave-settings-label">小時</span>
+      <button class="leave-settings-save" id="leaveDeadlineSave">儲存</button>
+    `;
+    leaveSection.appendChild(settingsWrap);
+
+    settingsWrap.querySelector('#leaveDeadlineSave').addEventListener('click', async () => {
+      const val = Number(settingsWrap.querySelector('#leaveDeadlineInput').value);
+      if (isNaN(val) || val < 0) { showToast('請輸入正確的小時數'); return; }
+      try {
+        await setDoc(teacherDoc('leaveSettings'), { deadlineHours: val }, { merge: true });
+        showToast('已更新請假截止時間');
+        renderLeaveSection();
+      } catch (e) { showToast('儲存失敗，請再試一次'); }
+    });
+
+    if (leaveItems.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'order-empty-hint';
+      empty.textContent = '目前還沒有請假申請';
+      leaveSection.appendChild(empty);
+      return;
+    }
+
+    const filterBar = document.createElement('div');
+    filterBar.className = 'admin-tab-bar';
+    filterBar.style.marginBottom = '12px';
+    filterBar.innerHTML = `
+      <button class="admin-tab active" data-filter="pending">待處理 (${leaveItems.filter(i => i.order.courses[i.courseIdx].leaveStatus === 'pending').length})</button>
+      <button class="admin-tab" data-filter="reviewed">已處理 (${leaveItems.filter(i => i.order.courses[i.courseIdx].leaveStatus !== 'pending').length})</button>
+    `;
+    leaveSection.appendChild(filterBar);
+
+    const listWrap = document.createElement('div');
+    leaveSection.appendChild(listWrap);
+
+    function renderFilteredLeaves(filter) {
+      listWrap.innerHTML = '';
+      const filtered = filter === 'reviewed'
+        ? leaveItems.filter(i => i.order.courses[i.courseIdx].leaveStatus !== 'pending')
+        : leaveItems.filter(i => i.order.courses[i.courseIdx].leaveStatus === 'pending');
+
+      if (filtered.length === 0) {
+        const hint = document.createElement('div');
+        hint.className = 'order-empty-hint';
+        hint.textContent = `沒有${filter === 'pending' ? '待處理' : '已處理'}的請假`;
+        listWrap.appendChild(hint);
+        return;
+      }
+
+      filtered.forEach(({ order, courseIdx }) => {
+        const c = order.courses[courseIdx];
+        const card = document.createElement('div');
+        card.className = 'admin-card leave-card';
+        card.style.marginBottom = '12px';
+
+        const isPending = c.leaveStatus === 'pending';
+
+        // 距離開課還有幾小時：用老師打開審核當下的即時時間計算（不是學生送出申請的時間）
+        const startTime = (c.time || '').split('~')[0].trim();
+        const classDateTime = (c.dateStr && startTime) ? new Date(`${c.dateStr}T${startTime}:00`) : null;
+        const hoursLeft = classDateTime ? (classDateTime - new Date()) / 3600000 : null;
+        const hoursLeftText = hoursLeft === null ? '未知'
+          : hoursLeft < 0 ? '已經開課'
+          : `${Math.round(hoursLeft)} 小時`;
+
+        // 超過截止時間（notice 給得夠早）→ 預選「是」增加剩餘堂數；未超過 → 預選「否」
+        const defaultIncrease = hoursLeft !== null && hoursLeft > deadlineHours;
+
+        const resultTagHtml = !isPending ? (
+          c.leaveStatus === 'approved_refund' ? '<span class="leave-result-tag refund">✓ 不扣堂・已退回</span>'
+          : c.leaveStatus === 'approved_deduct' ? '<span class="leave-result-tag deduct">✓ 已扣堂・已請假</span>'
+          : c.leaveStatus === 'rejected' ? '<span class="leave-result-tag rejected">✗ 已拒絕・恢復報名</span>'
+          : ''
+        ) : '';
+
+        card.innerHTML = `
+          <div class="order-header">
+            <div class="order-student-name">${order.studentName || '未知學生'}</div>
+            <div class="order-date">${c.leaveRequestedAt ? new Date(c.leaveRequestedAt).toLocaleString('zh-TW', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' }) : ''}</div>
+          </div>
+          <div class="order-course-title">${c.title}</div>
+          <div class="order-course-meta">📅 ${c.date} ${c.time}</div>
+          <div class="order-contact leave-countdown">${isPending ? `距離開課還有 ${hoursLeftText}` : ''}</div>
+          ${isPending ? `
+            <div class="order-course-actions leave-actions">
+              <button class="order-course-btn-confirm leave-btn-approve" data-order-id="${order.id}" data-course-idx="${courseIdx}">✓</button>
+              <button class="order-course-btn-cancel leave-btn-reject" data-order-id="${order.id}" data-course-idx="${courseIdx}">✕</button>
+            </div>
+            <div class="leave-expand" style="display:none">
+              <div class="credit-add-title">是否增加剩餘堂數（系統依截止時間預選，可覆蓋）</div>
+              <div class="order-course-actions" style="margin-bottom:8px">
+                <button type="button" class="order-course-btn-confirm leave-toggle-btn ${defaultIncrease ? 'selected' : ''}" data-value="yes" style="width:auto;padding:4px 14px">是</button>
+                <button type="button" class="order-course-btn-cancel leave-toggle-btn ${!defaultIncrease ? 'selected' : ''}" data-value="no" style="width:auto;padding:4px 14px">否</button>
+              </div>
+              <div class="credit-add-row">
+                <span class="credit-add-label">堂數異動</span>
+                <input class="credit-add-input leave-delta-input" type="number" value="${defaultIncrease ? 1 : 0}">
+                <span class="credit-add-unit">堂</span>
+              </div>
+              <div class="order-actions" style="margin-top:8px">
+                <button class="order-btn-finish leave-btn-finish" data-order-id="${order.id}" data-course-idx="${courseIdx}">審核完成</button>
+                <button class="order-btn-cancel leave-btn-undo">取消／改筆</button>
+              </div>
+            </div>
+          ` : `<div style="margin-top:8px">${resultTagHtml}</div>`}
+        `;
+        listWrap.appendChild(card);
+      });
+
+      // ✓ 展開審核表單
+      listWrap.querySelectorAll('.leave-btn-approve').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const card = btn.closest('.leave-card');
+          card.querySelector('.leave-actions').style.display = 'none';
+          card.querySelector('.leave-expand').style.display = 'block';
+        });
+      });
+
+      // 取消／改筆：收合回去，不做任何異動
+      listWrap.querySelectorAll('.leave-btn-undo').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const card = btn.closest('.leave-card');
+          card.querySelector('.leave-expand').style.display = 'none';
+          card.querySelector('.leave-actions').style.display = 'flex';
+        });
+      });
+
+      // 是／否 切換，連動堂數異動預設值
+      listWrap.querySelectorAll('.leave-toggle-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const group = btn.parentElement;
+          group.querySelectorAll('.leave-toggle-btn').forEach(b => b.classList.remove('selected'));
+          btn.classList.add('selected');
+          const deltaInput = btn.closest('.leave-expand').querySelector('.leave-delta-input');
+          deltaInput.value = btn.dataset.value === 'yes' ? 1 : 0;
+        });
+      });
+
+      // ✕ 拒絕：整筆請假申請打回，學生恢復「已報名」，堂數／名額都不動
+      listWrap.querySelectorAll('.leave-btn-reject').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const orderId = btn.dataset.orderId;
+          const courseIdx = Number(btn.dataset.courseIdx);
+          const item = leaveItems.find(i => i.order.id === orderId && i.courseIdx === courseIdx);
+          if (!item) return;
+          if (!confirm('確定要拒絕這筆請假申請嗎？學生會恢復為已報名狀態，堂數／名額都不變。')) return;
+          btn.disabled = true;
+          try {
+            const order = item.order;
+            const cc = order.courses[courseIdx];
+            const updatedCourses = order.courses.map((x, idx) =>
+              idx === courseIdx ? { ...x, leaveStatus: 'rejected', leaveReviewedAt: new Date().toISOString() } : x
+            );
+            await updateDoc(doc(db, 'teachers', tid, 'orders', orderId), { courses: updatedCourses });
+            try {
+              await updateDoc(doc(db, 'users', order.studentId, 'orders', orderId), { courses: updatedCourses });
+            } catch (syncErr) { console.warn('學生端同步失敗（不影響老師端）', syncErr); }
+            order.courses = updatedCourses;
+            pushNotification('users', order.studentId, {
+              type: 'leave_reviewed',
+              message: '您的請假申請未通過，已恢復為已報名狀態',
+              detail: `${cc.title} ${cc.date}${cc.time}`
+            });
+            if (currentView === 'calendar') renderCalendar(); else renderList();
+            showToast('已拒絕這筆請假申請');
+            renderLeaveSection();
+          } catch (e) {
+            showToast('操作失敗，請再試一次');
+            btn.disabled = false;
+          }
+        });
+      });
+
+      // 審核完成：依「是否增加剩餘堂數」寫回堂數池／名額／狀態，並通知學生
+      listWrap.querySelectorAll('.leave-btn-finish').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const orderId = btn.dataset.orderId;
+          const courseIdx = Number(btn.dataset.courseIdx);
+          const item = leaveItems.find(i => i.order.id === orderId && i.courseIdx === courseIdx);
+          if (!item) return;
+          const card = btn.closest('.leave-card');
+          const isIncrease = card.querySelector('.leave-toggle-btn.selected').dataset.value === 'yes';
+          const deltaRaw = card.querySelector('.leave-delta-input').value.trim();
+          const delta = deltaRaw === '' ? 0 : Number(deltaRaw);
+          if (isNaN(delta)) { showToast('堂數異動請輸入數字'); return; }
+
+          btn.textContent = '儲存中…'; btn.disabled = true;
+          try {
+            const order = item.order;
+            const cOld = order.courses[courseIdx];
+            const courseObj = courses.find(cs => cs.id === cOld.courseId) || { title: cOld.title };
+            const poolKey = getPoolKey(courseObj);
+
+            // 堂數異動（0 的話 adjustCredits 內部會自動跳過，不用另外判斷）
+            if (poolKey && delta) {
+              await adjustCredits(tid, order.studentId, order.studentName, poolKey, delta);
+            }
+
+            const updatedCourses = order.courses.map((x, idx) => {
+              if (idx !== courseIdx) return x;
+              return {
+                ...x,
+                leaveStatus: isIncrease ? 'approved_refund' : 'approved_deduct',
+                leaveReviewedAt: new Date().toISOString(),
+                result: isIncrease ? 'cancelled' : x.result
+              };
+            });
+            const allCancelled = updatedCourses.every(x => x.result === 'cancelled');
+            const newOrderStatus = allCancelled ? 'cancelled' : 'confirmed';
+
+            await updateDoc(doc(db, 'teachers', tid, 'orders', orderId), { courses: updatedCourses, status: newOrderStatus });
+            try {
+              await updateDoc(doc(db, 'users', order.studentId, 'orders', orderId), { courses: updatedCourses, status: newOrderStatus });
+            } catch (syncErr) { console.warn('學生端同步失敗（不影響老師端）', syncErr); }
+            order.courses = updatedCourses;
+            order.status = newOrderStatus;
+
+            // 不扣堂 → 名額退回：把這位學生從該堂課的報名名單移除，空出名額
+            if (isIncrease) {
+              const list = bookings[cOld.courseId] || [];
+              const bIdx = list.findIndex(b => b.studentId === order.studentId || b.name === order.studentName);
+              if (bIdx !== -1) {
+                list.splice(bIdx, 1);
+                bookings[cOld.courseId] = list;
+                await saveToStorage();
+              }
+            }
+
+            pushNotification('users', order.studentId, {
+              type: 'leave_reviewed',
+              message: isIncrease ? '您的請假申請已通過，堂數已退回' : '您的請假申請已處理，本次照常扣堂',
+              detail: `${cOld.title} ${cOld.date}${cOld.time}`
+            });
+
+            if (currentView === 'calendar') renderCalendar(); else renderList();
+            showToast('請假審核完成');
+            renderLeaveSection();
+          } catch (e) {
+            showToast('操作失敗，請再試一次');
+            btn.textContent = '審核完成'; btn.disabled = false;
+          }
+        });
+      });
+    }
+
+    filterBar.querySelectorAll('.admin-tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        filterBar.querySelectorAll('.admin-tab').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        renderFilteredLeaves(btn.dataset.filter);
+      });
+    });
+
+    renderFilteredLeaves('pending');
   }
 
   // ── 學生管理（v3.3）：列出每人各堂數池未用堂數 ＋ 手動調整入口 ──
