@@ -1879,6 +1879,17 @@ main { padding: 20px 16px 40px; max-width: 680px; margin: 0 auto; }
   font-size: 0.78rem;
   color: var(--latte-light);
 }
+/* 請假審核：堂數異動欄位仍是系統預設值、尚未被老師確認過時，文字反灰淡化 */
+.leave-delta-default {
+  color: var(--latte-light);
+  opacity: 0.6;
+}
+/* 請假審核：卡片內小字顯示學生送出申請的時間 */
+.leave-requested-at {
+  font-size: 0.72rem;
+  color: #aaa;
+  font-weight: 400;
+}
 .credit-manual-wrap {
   margin-top: 10px;
 }
@@ -2095,6 +2106,17 @@ main { padding: 20px 16px 40px; max-width: 680px; margin: 0 auto; }
   background: none;
   border: 1px solid #bbb;
   color: #999;
+  border-radius: 20px;
+  padding: 1px 7px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+.modal-roster-leave-tag {
+  display: inline-block;
+  font-size: 0.7rem;
+  background: none;
+  border: 1px solid #d9a441;
+  color: #b6812a;
   border-radius: 20px;
   padding: 1px 7px;
   margin-left: 6px;

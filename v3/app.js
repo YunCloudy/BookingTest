@@ -319,6 +319,13 @@ function renderStudentCreditList(credits) {
     : `<div class="student-credit-empty">目前沒有未用堂數</div>`;
 }
 
+// 從課程時間欄位（例如 "19:20-20:20"、"18:10~19:10"）解析出開始時間 "HH:MM"
+// 不依賴分隔符號（~ 或 -），直接抓字串裡第一個「數字:數字」樣式，兩種輸入格式都吃得下去
+function parseCourseStartTime(timeStr) {
+  const match = (timeStr || '').match(/(\d{1,2}:\d{2})/);
+  return match ? match[1] : '';
+}
+
 // ── 共用堂數調整函式 ──
 // 訂單審核完成時「未使用堂數異動」用這個：在原本堂數上累加 delta（可正可負，未來請假退堂也會用）
 async function adjustCredits(tid, studentId, studentName, poolKey, delta) {
@@ -987,6 +994,7 @@ function renderModalRoster(course) {
             <span class="modal-roster-name">${i + 1}. ${b.name}</span>
             ${b.phone ? `<span class="modal-roster-phone">${b.phone}</span>` : ''}
             ${b.studentId ? '<span class="modal-roster-linked">已登入</span>' : '<span class="modal-roster-guest">訪客</span>'}
+            ${b.studentId && b.orderId ? `<span class="modal-roster-leave-tag" id="rosterLeaveTag_${i}" style="display:none">🙋 已請假</span>` : ''}
           </div>
           <div class="roster-item-actions">
             ${b.studentId ? `<button class="roster-credit-toggle" type="button" data-idx="${i}" data-student-id="${b.studentId}" data-student-name="${b.name}" title="手動調整未用堂數">✍️</button>` : ''}
@@ -1014,6 +1022,26 @@ function renderModalRoster(course) {
         <button class="btn-primary" id="modalAddConfirm">新增</button>
       </div>
     </div>`;
+}
+
+// 老師端報名名單：標出「已扣堂請假」的學員（扣堂設計上仍佔名額、留在名單上，
+// 但老師光看名單看不出是請假扣堂還是正常出席，所以額外撈一次訂單狀態來加小標籤）
+async function annotateRosterLeaveStatus(course) {
+  const tid = teacherId || TEACHER_ID_STATIC;
+  const list = bookings[course.id] || [];
+  await Promise.all(list.map(async (b, i) => {
+    if (!b.studentId || !b.orderId) return;
+    const tag = document.getElementById(`rosterLeaveTag_${i}`);
+    if (!tag) return;
+    try {
+      const snap = await getDoc(doc(db, 'teachers', tid, 'orders', b.orderId));
+      if (!snap.exists()) return;
+      const c = (snap.data().courses || []).find(x => x.courseId === course.id);
+      if (c && c.leaveStatus === 'approved_deduct') {
+        tag.style.display = 'inline';
+      }
+    } catch (e) { /* 標籤是輔助資訊，撈取失敗就不顯示，不影響主要功能 */ }
+  }));
 }
 
 function bindModalRosterEvents(course) {
@@ -1324,6 +1352,7 @@ ${isAdmin() ? renderModalRoster(course) : (hasPendingLeave(course.id) ? `
 
   if (isAdmin()) {
     bindModalRosterEvents(course);
+    annotateRosterLeaveStatus(course);
   } else {
     const addToCartBtn = document.getElementById('addToCartBtn');
     if (addToCartBtn) {
@@ -3134,7 +3163,7 @@ function renderAdmin() {
         const isPending = c.leaveStatus === 'pending';
 
         // 距離開課還有幾小時：用老師打開審核當下的即時時間計算（不是學生送出申請的時間）
-        const startTime = (c.time || '').split('~')[0].trim();
+        const startTime = parseCourseStartTime(c.time);
         const classDateTime = (c.dateStr && startTime) ? new Date(`${c.dateStr}T${startTime}:00`) : null;
         const hoursLeft = classDateTime ? (classDateTime - new Date()) / 3600000 : null;
         const hoursLeftText = hoursLeft === null ? '未知'
@@ -3151,28 +3180,33 @@ function renderAdmin() {
           : ''
         ) : '';
 
+        const leaveRequestedAtText = c.leaveRequestedAt
+          ? new Date(c.leaveRequestedAt).toLocaleString('zh-TW', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' })
+          : '';
+
         card.innerHTML = `
           <div class="order-header">
             <div class="order-student-name">${order.studentName || '未知學生'}</div>
-            <div class="order-date">${c.leaveRequestedAt ? new Date(c.leaveRequestedAt).toLocaleString('zh-TW', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' }) : ''}</div>
+            ${isPending ? `
+              <div class="order-course-actions leave-actions">
+                <button class="order-course-btn-confirm leave-btn-approve" data-order-id="${order.id}" data-course-idx="${courseIdx}">✓</button>
+                <button class="order-course-btn-cancel leave-btn-reject" data-order-id="${order.id}" data-course-idx="${courseIdx}">✕</button>
+              </div>
+            ` : `<div class="order-date">${leaveRequestedAtText}</div>`}
           </div>
           <div class="order-course-title">${c.title}</div>
-          <div class="order-course-meta">📅 ${c.date} ${c.time}</div>
+          <div class="order-course-meta">📅 ${c.date} ${c.time}${isPending && leaveRequestedAtText ? `　<span class="leave-requested-at">申請於 ${leaveRequestedAtText}</span>` : ''}</div>
           <div class="order-contact leave-countdown">${isPending ? `距離開課還有 ${hoursLeftText}` : ''}</div>
           ${isPending ? `
-            <div class="order-course-actions leave-actions">
-              <button class="order-course-btn-confirm leave-btn-approve" data-order-id="${order.id}" data-course-idx="${courseIdx}">✓</button>
-              <button class="order-course-btn-cancel leave-btn-reject" data-order-id="${order.id}" data-course-idx="${courseIdx}">✕</button>
-            </div>
             <div class="leave-expand" style="display:none">
-              <div class="credit-add-title">是否增加剩餘堂數（系統依截止時間預選，可覆蓋）</div>
+              <div class="credit-add-title">是否增加未使用堂數（系統依截止時間預選，可覆蓋）</div>
               <div class="order-course-actions" style="margin-bottom:8px">
                 <button type="button" class="order-course-btn-confirm leave-toggle-btn ${defaultIncrease ? 'selected' : ''}" data-value="yes" style="width:auto;padding:4px 14px">是</button>
                 <button type="button" class="order-course-btn-cancel leave-toggle-btn ${!defaultIncrease ? 'selected' : ''}" data-value="no" style="width:auto;padding:4px 14px">否</button>
               </div>
               <div class="credit-add-row">
                 <span class="credit-add-label">堂數異動</span>
-                <input class="credit-add-input leave-delta-input" type="number" value="${defaultIncrease ? 1 : 0}">
+                <input class="credit-add-input leave-delta-input leave-delta-default" type="number" value="${defaultIncrease ? 1 : 0}" data-touched="false">
                 <span class="credit-add-unit">堂</span>
               </div>
               <div class="order-actions" style="margin-top:8px">
@@ -3203,7 +3237,7 @@ function renderAdmin() {
         });
       });
 
-      // 是／否 切換，連動堂數異動預設值
+      // 是／否 切換，連動堂數異動預設值（切換過視為「已確認」，取消反灰）
       listWrap.querySelectorAll('.leave-toggle-btn').forEach(btn => {
         btn.addEventListener('click', () => {
           const group = btn.parentElement;
@@ -3211,6 +3245,16 @@ function renderAdmin() {
           btn.classList.add('selected');
           const deltaInput = btn.closest('.leave-expand').querySelector('.leave-delta-input');
           deltaInput.value = btn.dataset.value === 'yes' ? 1 : 0;
+          deltaInput.dataset.touched = 'true';
+          deltaInput.classList.remove('leave-delta-default');
+        });
+      });
+
+      // 手動改數字欄位也視為「已確認」，取消反灰
+      listWrap.querySelectorAll('.leave-delta-input').forEach(input => {
+        input.addEventListener('input', () => {
+          input.dataset.touched = 'true';
+          input.classList.remove('leave-delta-default');
         });
       });
 
@@ -3258,9 +3302,15 @@ function renderAdmin() {
           if (!item) return;
           const card = btn.closest('.leave-card');
           const isIncrease = card.querySelector('.leave-toggle-btn.selected').dataset.value === 'yes';
-          const deltaRaw = card.querySelector('.leave-delta-input').value.trim();
+          const deltaInputEl = card.querySelector('.leave-delta-input');
+          const deltaRaw = deltaInputEl.value.trim();
           const delta = deltaRaw === '' ? 0 : Number(deltaRaw);
           if (isNaN(delta)) { showToast('堂數異動請輸入數字'); return; }
+
+          // 防呆：如果整組（是/否切換、數字欄）從打開表單到現在完全沒被動過，跳確認框再送出
+          if (deltaInputEl.dataset.touched !== 'true') {
+            if (!confirm(`堂數異動維持系統預設值 ${delta} 堂，確定送出嗎？`)) return;
+          }
 
           btn.textContent = '儲存中…'; btn.disabled = true;
           try {
