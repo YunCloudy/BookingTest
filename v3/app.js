@@ -984,17 +984,17 @@ document.getElementById('calNext').addEventListener('click', () => {
 });
 
 // ── MODAL ROSTER (admin) ──
-function renderModalRoster(course) {
-  const list = bookings[course.id] || [];
-  const itemsHtml = list.length === 0
-    ? '<div class="modal-no-roster">尚無報名學員</div>'
-    : list.map((b, i) => `
+// 報名名單每一列的 HTML（v3.4：已請假狀態直接讀 booking.onLeave，同步顯示，不用另外查訂單）
+// 抽成獨立函式是因為 ✍️ 面板切換已請假狀態後，只需要重繪這塊，不用整個 modal 重開
+function buildRosterItemsHtml(course, list) {
+  if (list.length === 0) return '<div class="modal-no-roster">尚無報名學員</div>';
+  return list.map((b, i) => `
         <div class="modal-roster-item" data-index="${i}">
           <div>
             <span class="modal-roster-name">${i + 1}. ${b.name}</span>
             ${b.phone ? `<span class="modal-roster-phone">${b.phone}</span>` : ''}
             ${b.studentId ? '<span class="modal-roster-linked">已登入</span>' : '<span class="modal-roster-guest">訪客</span>'}
-            ${b.studentId && b.orderId ? `<span class="modal-roster-leave-tag" id="rosterLeaveTag_${i}" style="display:none">🙋 已請假</span>` : ''}
+            ${b.onLeave ? '<span class="modal-roster-leave-tag">🙋 已請假</span>' : ''}
           </div>
           <div class="roster-item-actions">
             ${b.studentId ? `<button class="roster-credit-toggle" type="button" data-idx="${i}" data-student-id="${b.studentId}" data-student-name="${b.name}" title="手動調整未用堂數">✍️</button>` : ''}
@@ -1003,11 +1003,23 @@ function renderModalRoster(course) {
         </div>
         ${b.studentId ? `
         <div class="roster-credit-form" id="rosterCreditForm_${i}" style="display:none">
-          <select class="roster-credit-pool"><option>載入中…</option></select>
-          <input class="roster-credit-total" type="number" value="0">
-          <span class="roster-credit-unit">堂</span>
-          <button class="roster-credit-apply" type="button" data-student-id="${b.studentId}" data-student-name="${b.name}">套用</button>
+          <div class="roster-credit-row">
+            <select class="roster-credit-pool"><option>載入中…</option></select>
+            <input class="roster-credit-total" type="number" value="0">
+            <span class="roster-credit-unit">堂</span>
+            <button class="roster-credit-apply" type="button" data-student-id="${b.studentId}" data-student-name="${b.name}">套用</button>
+          </div>
+          <div class="roster-leave-toggle-row">
+            <button class="roster-leave-toggle-btn" type="button" data-idx="${i}" data-student-id="${b.studentId}" data-student-name="${b.name}">
+              ${b.onLeave ? '↩️ 取消請假標記' : '🙋 標記為已請假'}
+            </button>
+          </div>
         </div>` : ''}`).join('');
+}
+
+function renderModalRoster(course) {
+  const list = bookings[course.id] || [];
+  const itemsHtml = buildRosterItemsHtml(course, list);
 
   return `
       <div class="modal-roster-title">已報名學員（${list.length} 人）</div>
@@ -1022,26 +1034,6 @@ function renderModalRoster(course) {
         <button class="btn-primary" id="modalAddConfirm">新增</button>
       </div>
     </div>`;
-}
-
-// 老師端報名名單：標出「已扣堂請假」的學員（扣堂設計上仍佔名額、留在名單上，
-// 但老師光看名單看不出是請假扣堂還是正常出席，所以額外撈一次訂單狀態來加小標籤）
-async function annotateRosterLeaveStatus(course) {
-  const tid = teacherId || TEACHER_ID_STATIC;
-  const list = bookings[course.id] || [];
-  await Promise.all(list.map(async (b, i) => {
-    if (!b.studentId || !b.orderId) return;
-    const tag = document.getElementById(`rosterLeaveTag_${i}`);
-    if (!tag) return;
-    try {
-      const snap = await getDoc(doc(db, 'teachers', tid, 'orders', b.orderId));
-      if (!snap.exists()) return;
-      const c = (snap.data().courses || []).find(x => x.courseId === course.id);
-      if (c && c.leaveStatus === 'approved_deduct') {
-        tag.style.display = 'inline';
-      }
-    } catch (e) { /* 標籤是輔助資訊，撈取失敗就不顯示，不影響主要功能 */ }
-  }));
 }
 
 function bindModalRosterEvents(course) {
@@ -1124,6 +1116,41 @@ function bindModalRosterEvents(course) {
         showToast('調整失敗，請再試一次');
       }
       btn.textContent = '套用'; btn.disabled = false;
+    });
+  });
+
+  // ✍️面板：雙向切換「已請假／未請假」（v3.4）
+  // 標記已請假 = 這堂算請假，堂數池退回一堂（+1）；取消標記 = 改回正常出席，堂數池扣回去（-1）
+  // 名額本身不動（一直都在名單上），只是切換 booking.onLeave 這個欄位跟連動堂數
+  document.querySelectorAll('.roster-leave-toggle-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const idx = Number(btn.dataset.idx);
+      const list = bookings[course.id] || [];
+      const b = list[idx];
+      if (!b) return;
+      const turningOn = !b.onLeave;
+      const poolKey = getPoolKey(course);
+      const delta = turningOn ? 1 : -1;
+
+      btn.disabled = true; btn.textContent = '處理中…';
+      try {
+        if (poolKey) {
+          const updatedCredits = await adjustCredits(tid, b.studentId, b.name, poolKey, delta);
+          if (!turningOn && updatedCredits && (updatedCredits[poolKey] || 0) < 0) {
+            showToast(`已取消請假標記，但${poolLabel(poolKey)}目前變成負數，記得留意`);
+          }
+        }
+        b.onLeave = turningOn;
+        bookings[course.id] = list;
+        await saveToStorage();
+        if (turningOn) showToast('已標記為已請假');
+        else if (!poolKey) showToast('已取消請假標記');
+        openModal(course);
+      } catch (e) {
+        showToast('切換失敗，請再試一次');
+        btn.disabled = false;
+        btn.textContent = turningOn ? '🙋 標記為已請假' : '↩️ 取消請假標記';
+      }
     });
   });
 
@@ -1353,7 +1380,6 @@ ${isAdmin() ? renderModalRoster(course) : (hasPendingLeave(course.id) ? `
 
   if (isAdmin()) {
     bindModalRosterEvents(course);
-    annotateRosterLeaveStatus(course);
   } else {
     const addToCartBtn = document.getElementById('addToCartBtn');
     if (addToCartBtn) {
@@ -3348,11 +3374,18 @@ function renderAdmin() {
             order.status = newOrderStatus;
 
             // 不扣堂 → 名額退回：把這位學生從該堂課的報名名單移除，空出名額
+            // 扣堂 → 名額不動，但在 booking 上標記 onLeave，讓老師端名單同步顯示「已請假」（v3.4，改存在 booking 本身，不用再反查訂單）
+            const list = bookings[cOld.courseId] || [];
+            const bIdx = list.findIndex(b => b.studentId === order.studentId || b.name === order.studentName);
             if (isIncrease) {
-              const list = bookings[cOld.courseId] || [];
-              const bIdx = list.findIndex(b => b.studentId === order.studentId || b.name === order.studentName);
               if (bIdx !== -1) {
                 list.splice(bIdx, 1);
+                bookings[cOld.courseId] = list;
+                await saveToStorage();
+              }
+            } else {
+              if (bIdx !== -1) {
+                list[bIdx] = { ...list[bIdx], onLeave: true };
                 bookings[cOld.courseId] = list;
                 await saveToStorage();
               }

@@ -2170,13 +2170,18 @@ main { padding: 20px 16px 40px; max-width: 680px; margin: 0 auto; }
 .roster-credit-toggle:hover { border-color: var(--rose-dark, #c88b8b); color: var(--rose-dark, #c88b8b); }
 .roster-credit-form {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 8px;
   margin: 6px 0 10px;
   padding: 8px 10px;
   background: #f7efe9;
   border: 1px solid var(--mocha-light);
   border-radius: 8px;
+}
+.roster-credit-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 .roster-credit-pool {
   flex: 1;
@@ -2217,6 +2222,24 @@ main { padding: 20px 16px 40px; max-width: 680px; margin: 0 auto; }
 }
 .roster-credit-apply:hover { opacity: 0.85; }
 .roster-credit-apply:disabled { opacity: 0.5; cursor: default; }
+.roster-leave-toggle-row {
+  display: flex;
+  border-top: 1px solid var(--mocha-light);
+  padding-top: 8px;
+}
+.roster-leave-toggle-btn {
+  width: 100%;
+  border: 1px solid #d9a441;
+  border-radius: 6px;
+  background: #fff;
+  color: #b6812a;
+  padding: 6px 10px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  font-family: inherit;
+}
+.roster-leave-toggle-btn:hover { opacity: 0.85; }
+.roster-leave-toggle-btn:disabled { opacity: 0.5; cursor: default; }
 
 /* ── 批次功能設定 ── */
 .batch-feature-row {
