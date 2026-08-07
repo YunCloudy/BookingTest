@@ -315,7 +315,7 @@ function renderStudentCreditList(credits) {
   if (!wrap) return;
   const entries = Object.entries(credits || {}).filter(([, v]) => v);
   wrap.innerHTML = entries.length
-    ? `<div class="credit-tags" style="justify-content:center">${entries.map(([pk, v]) => `<span class="student-credit-tag">${poolLabel(pk)} <b>${v}</b> 堂</span>`).join('')}</div>`
+    ? `<div class="credit-tags" style="justify-content:center">${entries.map(([pk, v]) => `<span class="student-credit-tag">${poolLabel(pk)}　剩餘 <b>${v}</b> 堂</span>`).join('')}</div>`
     : `<div class="student-credit-empty">目前沒有剩餘堂數</div>`;
 }
 
@@ -3083,7 +3083,7 @@ function renderAdmin() {
           <div class="credit-tags" style="margin:6px 0">
             ${poolEntries.length
               ? poolEntries.map(([pk, v]) => `<span class="credit-tag">${poolLabel(pk)}　剩餘 <b>${v}</b> 堂</span>`).join('')
-              : `<span class="credit-tag credit-tag-empty">尚無堂數</span>`}
+              : `<span class="credit-tag credit-tag-empty">尚無剩餘堂數</span>`}
           </div>
           <div class="credit-manual-wrap" data-student-id="${s.studentId}" data-student-name="${s.studentName}">
             <button class="credit-manual-toggle" type="button">✍️手動調整堂數</button>
