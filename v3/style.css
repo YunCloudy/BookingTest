@@ -1806,12 +1806,6 @@ main { padding: 20px 16px 40px; max-width: 680px; margin: 0 auto; }
   color: var(--latte-light);
   margin-bottom: 6px;
 }
-.credit-current-wrap {
-  margin: 8px 0 4px;
-  padding: 8px 10px;
-  background: rgba(0,0,0,0.15);
-  border-radius: 8px;
-}
 .credit-add-row {
   display: flex;
   align-items: center;
@@ -1980,18 +1974,29 @@ main { padding: 20px 16px 40px; max-width: 680px; margin: 0 auto; }
 }
 
 /* ── ✍️手動調整堂數（已報名學員名單，白底彈窗版本）── */
+.roster-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
 .roster-credit-toggle {
-  display: inline-block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: none;
-  border: none;
-  font-size: 0.85rem;
-  margin-left: 6px;
-  padding: 0 2px;
+  border: 1px solid #ddd;
+  color: #aaa;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  font-size: 0.7rem;
+  padding: 0;
   cursor: pointer;
-  vertical-align: middle;
+  flex-shrink: 0;
   line-height: 1;
 }
-.roster-credit-toggle:hover { opacity: 0.7; }
+.roster-credit-toggle:hover { border-color: var(--rose-dark, #c88b8b); color: var(--rose-dark, #c88b8b); }
 .roster-credit-form {
   display: flex;
   align-items: center;

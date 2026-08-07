@@ -972,9 +972,11 @@ function renderModalRoster(course) {
             <span class="modal-roster-name">${i + 1}. ${b.name}</span>
             ${b.phone ? `<span class="modal-roster-phone">${b.phone}</span>` : ''}
             ${b.studentId ? '<span class="modal-roster-linked">已登入</span>' : '<span class="modal-roster-guest">訪客</span>'}
-            ${b.studentId ? `<button class="roster-credit-toggle" type="button" data-idx="${i}" data-student-id="${b.studentId}" data-student-name="${b.name}" title="手動調整堂數">✍️</button>` : ''}
           </div>
-          <button class="modal-delete-btn" data-index="${i}" data-student-id="${b.studentId || ''}" data-order-id="${b.orderId || ''}">🗑</button>
+          <div class="roster-item-actions">
+            ${b.studentId ? `<button class="roster-credit-toggle" type="button" data-idx="${i}" data-student-id="${b.studentId}" data-student-name="${b.name}" title="手動調整堂數">✍️</button>` : ''}
+            <button class="modal-delete-btn" data-index="${i}" data-student-id="${b.studentId || ''}" data-order-id="${b.orderId || ''}">🗑</button>
+          </div>
         </div>
         ${b.studentId ? `
         <div class="roster-credit-form" id="rosterCreditForm_${i}" style="display:none">
@@ -2409,7 +2411,7 @@ function renderAdmin() {
         // 預設空白不是 0：0 也是一個「有意義的輸入」，空白才代表老師還沒填
         const creditAddHtml = isPending && order.studentId && orderPoolKeys.length ? `
           <div class="credit-add-wrap" data-order-id="${order.id}">
-            <div class="credit-add-title">本次新增堂數（審核完成時自動加總，不用手動加總舊堂數）</div>
+            <div class="credit-add-title">本次新增堂數（審核完成時自動加總，<br>不用手動加總舊堂數）</div>
             ${orderPoolKeys.map(pk => {
               const draft = localStorage.getItem(`credit_draft_${order.id}_${pk}`);
               const val = draft != null ? draft : '';
@@ -2425,12 +2427,11 @@ function renderAdmin() {
         ` : '';
 
         // ── 目前剩餘堂數：只有待審核訂單顯示，放在最上面「聯絡資訊」的位置（展開才看得到）──
+        // 標題沿用 order-contact 那個灰色（跟日期同一種灰），標籤不額外包深色底，跟學生管理頁視覺一致
         const contactHtml = isPending && order.studentId && orderPoolKeys.length ? `
-          <div class="credit-current-wrap">
-            <div class="credit-add-title">剩餘堂數</div>
-            <div class="credit-tags">
-              ${orderPoolKeys.map(pk => `<span class="credit-tag">${poolLabel(pk)} ${studentCredits[pk] || 0}堂</span>`).join('')}
-            </div>
+          <div class="order-contact">剩餘堂數</div>
+          <div class="credit-tags" style="margin-bottom:8px">
+            ${orderPoolKeys.map(pk => `<span class="credit-tag">${poolLabel(pk)} ${studentCredits[pk] || 0}堂</span>`).join('')}
           </div>
         ` : `<div class="order-contact">本行文字待定，預計填寫email/手機/line名稱</div>`;
 
