@@ -1979,6 +1979,69 @@ main { padding: 20px 16px 40px; max-width: 680px; margin: 0 auto; }
   vertical-align: middle;
 }
 
+/* ── ✍️手動調整堂數（已報名學員名單，白底彈窗版本）── */
+.roster-credit-toggle {
+  display: inline-block;
+  background: none;
+  border: none;
+  font-size: 0.85rem;
+  margin-left: 6px;
+  padding: 0 2px;
+  cursor: pointer;
+  vertical-align: middle;
+  line-height: 1;
+}
+.roster-credit-toggle:hover { opacity: 0.7; }
+.roster-credit-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0 10px;
+  padding: 8px 10px;
+  background: #f7efe9;
+  border: 1px solid var(--mocha-light);
+  border-radius: 8px;
+}
+.roster-credit-pool {
+  flex: 1;
+  min-width: 0;
+  background: #fff;
+  color: var(--mocha);
+  border: 1px solid var(--mocha-light);
+  border-radius: 6px;
+  padding: 5px 6px;
+  font-size: 0.8rem;
+  font-family: inherit;
+}
+.roster-credit-total {
+  width: 54px;
+  border: none;
+  border-bottom: 1px solid var(--mocha-light);
+  background: transparent;
+  font-size: 0.9rem;
+  color: var(--mocha);
+  text-align: right;
+  padding: 0 2px;
+  outline: none;
+}
+.roster-credit-unit {
+  font-size: 0.78rem;
+  color: #a08070;
+}
+.roster-credit-apply {
+  flex-shrink: 0;
+  border: none;
+  border-radius: 6px;
+  background: var(--rose-dark, #c88b8b);
+  color: #fff;
+  padding: 6px 12px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  font-family: inherit;
+}
+.roster-credit-apply:hover { opacity: 0.85; }
+.roster-credit-apply:disabled { opacity: 0.5; cursor: default; }
+
 /* ── 批次功能設定 ── */
 .batch-feature-row {
   display: flex;
