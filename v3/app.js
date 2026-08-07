@@ -9,7 +9,7 @@
 //       {userId}/
 //         name            → 學生姓名
 //         email           → 學生 email
-//         remainingCredits → 剩餘堂數
+//         remainingCredits → 未用堂數
 //         orders/         → 訂單紀錄
 //           {orderId}/
 //             courses[]   → 報名的課程
@@ -54,7 +54,7 @@ let teacherName = null;     // 從 admins/{uid}.name 拿
 let currentTeacher = null;  // Google 登入的老師（Firebase User）
 let currentStudent = null;  // Google 登入的學生
 let studentOrders = [];     // 學生登入後從 users/{uid}/orders/ 撈回來的訂單
-let currentStudentCredits = {}; // 學生登入後自己的剩餘堂數（從 users/{uid}.remainingCredits 讀，v3.3 第二階段）
+let currentStudentCredits = {}; // 學生登入後自己的未用堂數（從 users/{uid}.remainingCredits 讀，v3.3 第二階段）
 
 // ── CART ──
 const TEACHER_ID_STATIC = 'test_aerial';
@@ -268,7 +268,7 @@ function teacherDoc(name) {
 // ── 堂數池 (v3.3) ──
 // Firestore: teachers/{teacherId}/students/{studentId}
 //   name              → 學生姓名（方便老師端不用每次都查訂單）
-//   remainingCredits  → { [poolKey]: 剩餘堂數 }
+//   remainingCredits  → { [poolKey]: 未用堂數 }
 // 同步鏡射一份到 users/{studentId}.remainingCredits，供學生端讀取（v3.3 第二階段用）
 // ══════════════════════════════════════════
 
@@ -309,18 +309,18 @@ async function getStudentCredits(tid, studentId) {
   }
 }
 
-// 學生端：把剩餘堂數畫進「🎫 剩餘堂數」卡片（v3.3 第二階段，改成獨立卡片，方便未來多老師擴充）
+// 學生端：把未用堂數畫進「🎫 未用堂數」卡片（v3.3 第二階段，改成獨立卡片，方便未來多老師擴充）
 function renderStudentCreditList(credits) {
   const wrap = document.getElementById('studentCreditList');
   if (!wrap) return;
   const entries = Object.entries(credits || {}).filter(([, v]) => v);
   wrap.innerHTML = entries.length
     ? `<div class="credit-tags" style="justify-content:center">${entries.map(([pk, v]) => `<span class="student-credit-tag">${poolLabel(pk)}　剩餘 <b>${v}</b> 堂</span>`).join('')}</div>`
-    : `<div class="student-credit-empty">目前沒有剩餘堂數</div>`;
+    : `<div class="student-credit-empty">目前沒有未用堂數</div>`;
 }
 
 // ── 共用堂數調整函式 ──
-// 訂單審核完成時「本次新增堂數」用這個：在原本堂數上累加 delta（可正可負，未來請假退堂也會用）
+// 訂單審核完成時「未使用堂數異動」用這個：在原本堂數上累加 delta（可正可負，未來請假退堂也會用）
 async function adjustCredits(tid, studentId, studentName, poolKey, delta) {
   if (!tid || !studentId || !poolKey || !delta) return null;
   const ref = studentDocRef(tid, studentId);
@@ -1947,7 +1947,7 @@ document.getElementById('googleLoginBtn').addEventListener('click', () => {
 });
 
 // 個人資料
-// 🎫 剩餘堂數卡片
+// 🎫 未用堂數卡片
 document.getElementById('studentCreditBtn').addEventListener('click', async () => {
   document.getElementById('studentDropdown').classList.remove('open');
   document.getElementById('studentCreditList').innerHTML = '<div class="student-credit-empty">讀取中…</div>';
@@ -2419,7 +2419,7 @@ function renderAdmin() {
 
     orders.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
 
-    // 撈這批訂單涉及到的所有學生目前剩餘堂數（資料已在記憶體，審核時不用多查一次）
+    // 撈這批訂單涉及到的所有學生目前未用堂數（資料已在記憶體，審核時不用多查一次）
     const creditsMap = new Map(); // studentId → { [poolKey]: 數量 }
     const uniqueStudentIds = [...new Set(orders.map(o => o.studentId).filter(Boolean))];
     await Promise.all(uniqueStudentIds.map(async sid => {
@@ -2488,7 +2488,7 @@ function renderAdmin() {
 
         const isPending = order.status === 'pending';
 
-        // ── 堂數池：這筆訂單涉及的 poolKey，以及該學生目前各池剩餘堂數 ──
+        // ── 堂數池：這筆訂單涉及的 poolKey，以及該學生目前各池未用堂數 ──
         const studentCredits = creditsMap.get(order.studentId) || {};
         const orderPoolKeys = [...new Set(
           (order.courses || []).map(c => getPoolKey(courses.find(cs => cs.id === c.courseId) || { title: c.title }))
@@ -2498,7 +2498,7 @@ function renderAdmin() {
         // 預設空白不是 0：0 也是一個「有意義的輸入」，空白才代表老師還沒填
         const creditAddHtml = isPending && order.studentId && orderPoolKeys.length ? `
           <div class="credit-add-wrap" data-order-id="${order.id}">
-            <div class="credit-add-title">本次新增堂數<br>（審核完成時自動加總，不用手動加總舊堂數）</div>
+            <div class="credit-add-title">未使用堂數異動<br>（增加請填正數、減少請填負數）<br>（審核完成後自動套用，不用手動計算目前總堂數）</div>
             ${orderPoolKeys.map(pk => {
               const draft = localStorage.getItem(`credit_draft_${order.id}_${pk}`);
               const val = draft != null ? draft : '';
@@ -2513,10 +2513,10 @@ function renderAdmin() {
           </div>
         ` : '';
 
-        // ── 目前剩餘堂數：只有待審核訂單顯示，放在最上面「聯絡資訊」的位置（展開才看得到）──
+        // ── 目前未用堂數：只有待審核訂單顯示，放在最上面「聯絡資訊」的位置（展開才看得到）──
         // 標題沿用 order-contact 那個灰色（跟日期同一種灰），標籤不額外包深色底，跟學生管理頁視覺一致
         const contactHtml = isPending && order.studentId && orderPoolKeys.length ? `
-          <div class="order-contact">剩餘堂數</div>
+          <div class="order-contact">未用堂數</div>
           <div class="credit-tags" style="margin-bottom:8px">
             ${orderPoolKeys.map(pk => `<span class="credit-tag">${poolLabel(pk)} <b>${studentCredits[pk] || 0}</b>堂</span>`).join('')}
           </div>
@@ -2780,7 +2780,7 @@ function renderAdmin() {
         });
       });
 
-      // ── 本次新增堂數暫存到 localStorage（跟金額一樣，重整或切出去不會不見）──
+      // ── 未使用堂數異動暫存到 localStorage（跟金額一樣，重整或切出去不會不見）──
       listWrap.querySelectorAll('.credit-add-input').forEach(input => {
         input.addEventListener('input', () => {
           localStorage.setItem(`credit_draft_${input.dataset.orderId}_${input.dataset.pool}`, input.value);
@@ -2830,14 +2830,14 @@ function renderAdmin() {
             showToast('此課程需先付款，請確認付款狀態');
             return;
           }
-          // 防呆：這筆訂單有堂數池、但「本次新增堂數」整排都還沒填，跳出來確認一下，避免忘記填就送出
+          // 防呆：這筆訂單有堂數池、但「未使用堂數異動」整排都還沒填，跳出來確認一下，避免忘記填就送出
           const addWrapCheck = listWrap.querySelector(`.credit-add-wrap[data-order-id="${orderId}"]`);
           if (addWrapCheck) {
             const addInputsCheck = [...addWrapCheck.querySelectorAll('.credit-add-input')];
             const allEmpty = addInputsCheck.some(inp => inp.value.trim() === '');
             const hasConfirmed = order.courses.some(c => c.localResult === 'confirmed');
             if (allEmpty && hasConfirmed) {
-              const proceed = confirm('本次新增堂數還沒填寫，確定要不新增堂數直接送出審核嗎？');
+              const proceed = confirm('未使用堂數異動還沒填寫，確定不調整堂數直接送出審核嗎？');
               if (!proceed) return;
             }
           }
@@ -2879,7 +2879,7 @@ function renderAdmin() {
             }
             await saveToStorage();
             order.status = newStatus;
-            // 本次新增堂數：讀取「本次新增幾堂」輸入框，自動加總到對應堂數池
+            // 未使用堂數異動：讀取「本次新增幾堂」輸入框，自動加總到對應堂數池
             if (order.studentId) {
               const addWrap = listWrap.querySelector(`.credit-add-wrap[data-order-id="${orderId}"]`);
               if (addWrap) {
@@ -3000,7 +3000,7 @@ function renderAdmin() {
     renderFilteredOrders('pending');
   }
 
-  // ── 學生管理（v3.3）：列出每人各堂數池剩餘堂數 ＋ 手動調整入口 ──
+  // ── 學生管理（v3.3）：列出每人各堂數池未用堂數 ＋ 手動調整入口 ──
   async function renderStudentSection() {
     studentSection.innerHTML = '<div class="admin-section-title">學生管理</div><div style="padding:16px;color:#aaa;font-size:0.85rem">載入中…</div>';
 
@@ -3083,7 +3083,7 @@ function renderAdmin() {
           <div class="credit-tags" style="margin:6px 0">
             ${poolEntries.length
               ? poolEntries.map(([pk, v]) => `<span class="credit-tag">${poolLabel(pk)}　剩餘 <b>${v}</b> 堂</span>`).join('')
-              : `<span class="credit-tag credit-tag-empty">尚無剩餘堂數</span>`}
+              : `<span class="credit-tag credit-tag-empty">尚無未用堂數</span>`}
           </div>
           <div class="credit-manual-wrap" data-student-id="${s.studentId}" data-student-name="${s.studentName}">
             <button class="credit-manual-toggle" type="button">✍️手動調整堂數</button>
