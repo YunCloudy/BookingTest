@@ -54,6 +54,7 @@ let teacherName = null;     // 從 admins/{uid}.name 拿
 let currentTeacher = null;  // Google 登入的老師（Firebase User）
 let currentStudent = null;  // Google 登入的學生
 let studentOrders = [];     // 學生登入後從 users/{uid}/orders/ 撈回來的訂單
+let currentStudentCredits = {}; // 學生登入後自己的剩餘堂數（從 users/{uid}.remainingCredits 讀，v3.3 第二階段）
 
 // ── CART ──
 const TEACHER_ID_STATIC = 'test_aerial';
@@ -308,6 +309,19 @@ async function getStudentCredits(tid, studentId) {
   }
 }
 
+// 學生端：把 currentStudentCredits 畫進登入下拉選單（v3.3 第二階段）
+function renderStudentCreditWrap() {
+  const wrap = document.getElementById('studentCreditWrap');
+  if (!wrap) return;
+  const entries = Object.entries(currentStudentCredits || {}).filter(([, v]) => v);
+  wrap.innerHTML = `
+    <div class="student-credit-title">剩餘堂數</div>
+    ${entries.length
+      ? entries.map(([pk, v]) => `<span class="student-credit-tag">${poolLabel(pk)} <b>${v}</b> 堂</span>`).join('')
+      : `<span class="student-credit-empty">目前沒有剩餘堂數</span>`}
+  `;
+}
+
 // ── 共用堂數調整函式 ──
 // 訂單審核完成時「本次新增堂數」用這個：在原本堂數上累加 delta（可正可負，未來請假退堂也會用）
 async function adjustCredits(tid, studentId, studentName, poolKey, delta) {
@@ -545,10 +559,11 @@ function renderList() {
 
     let spotsHtml = buildSpotsHtml(state, remaining, c.maxSpots);
 
-    // 學生端：已報名 / 審核中 標籤
-    const enrolledTag  = (!isAdmin() && isEnrolled(c.id))    ? '<span class="tag-enrolled">✓ 已報名</span>' : '';
+    // 學生端：已報名 / 審核中 / 請假申請中 標籤
+    const leaveTag     = (!isAdmin() && hasPendingLeave(c.id)) ? '<span class="tag-leave">🙋 請假申請中</span>' : '';
+    const enrolledTag  = (!isAdmin() && !hasPendingLeave(c.id) && isEnrolled(c.id))    ? '<span class="tag-enrolled">✓ 已報名</span>' : '';
     const pendingTag   = (!isAdmin() && !isEnrolled(c.id) && hasPendingOrder(c.id)) ? '<span class="tag-pending">⏳ 審核中</span>' : '';
-    const statusTag    = enrolledTag || pendingTag;
+    const statusTag    = leaveTag || enrolledTag || pendingTag;
 
     const wrapper = document.createElement('div');
     wrapper.className = 'course-card-wrap';
@@ -924,7 +939,8 @@ function renderDayDetail(dateStr, dayCourses) {
     const isFull = state === 'closed' || state === 'full';
     const dotColor = state === 'open' ? 'var(--rose)' : state === 'pending' ? 'var(--gold)' : '#ccc';
     const spotsText = state === 'closed' ? '已關閉' : state === 'full' ? '已滿班' : state === 'pending' ? `待開班・餘 ${remaining} 位` : `餘 ${remaining} 位`;
-    const dciTag = (!isAdmin() && isEnrolled(c.id)) ? '<span class="tag-enrolled">✓ 已報名</span>'
+    const dciTag = (!isAdmin() && hasPendingLeave(c.id)) ? '<span class="tag-leave">🙋 請假申請中</span>'
+                 : (!isAdmin() && isEnrolled(c.id)) ? '<span class="tag-enrolled">✓ 已報名</span>'
                  : (!isAdmin() && hasPendingOrder(c.id)) ? '<span class="tag-pending">⏳ 審核中</span>' : '';
 
     html += `
@@ -1278,10 +1294,15 @@ function openModal(course) {
     <div>${roster.map((b,i) => `<div class="modal-roster-item"><span class="modal-roster-name">${i+1}. ${b.name}</span></div>`).join('')}</div>
   </div>`;
 })() : ''}
-${isAdmin() ? renderModalRoster(course) : (isEnrolled(course.id) ? `
+${isAdmin() ? renderModalRoster(course) : (hasPendingLeave(course.id) ? `
+    <div id="cartBtnArea">
+      <div class="cart-added-label">🙋 請假審核中</div>
+      <button class="btn-cart btn-cart-added" disabled>等待老師確認</button>
+    </div>` : isEnrolled(course.id) ? `
     <div id="cartBtnArea">
       <div class="cart-added-label">已經報名囉！</div>
       <button class="btn-cart btn-cart-added" disabled>✓ 已報名</button>
+      <button class="btn-leave-request" id="leaveRequestBtn">🙋 申請請假</button>
     </div>` : hasPendingOrder(course.id) ? `
     <div id="cartBtnArea">
       <div class="cart-added-label">⏳ 訂單審核中</div>
@@ -1308,6 +1329,10 @@ ${isAdmin() ? renderModalRoster(course) : (isEnrolled(course.id) ? `
         const area = document.getElementById('cartBtnArea');
         if (area) area.innerHTML = '<div class="cart-added-label">✓ 已加入購物車</div><button class="btn-cart btn-cart-added" disabled>已在購物車中</button>';
       });
+    }
+    const leaveRequestBtn = document.getElementById('leaveRequestBtn');
+    if (leaveRequestBtn) {
+      leaveRequestBtn.addEventListener('click', () => submitLeaveRequest(course));
     }
   }
   document.getElementById('closeModalBtn').addEventListener('click', closeModal);
@@ -1384,6 +1409,53 @@ function hasPendingOrder(courseId) {
   return studentOrders.some(o =>
     o.courses?.some(c => c.courseId === courseId && c.result === 'pending')
   );
+}
+
+// 該課程已送出請假申請、等待老師審核（v3.3 第三階段）
+function hasPendingLeave(courseId) {
+  return studentOrders.some(o =>
+    o.courses?.some(c => c.courseId === courseId && c.leaveStatus === 'pending')
+  );
+}
+
+// 找出這個學生「已報名、可以申請請假」的那筆訂單（confirmed 且尚未有請假申請）
+function findLeaveableOrder(courseId) {
+  return studentOrders.find(o =>
+    o.courses?.some(c => c.courseId === courseId && c.result === 'confirmed' && (!c.leaveStatus || c.leaveStatus === 'none'))
+  );
+}
+
+// 學生送出請假申請：把該筆訂單裡對應課程標記 leaveStatus = 'pending'
+// 老師端審核（v3.3 第四階段）會依此欄位處理扣堂／退堂
+async function submitLeaveRequest(course) {
+  if (!currentStudent) return;
+  const order = findLeaveableOrder(course.id);
+  if (!order) { showToast('找不到對應的報名紀錄'); return; }
+  if (!confirm(`確定要申請「${course.title}」${course.date} ${course.time} 的請假嗎？`)) return;
+  const tid = order.teacherId || TEACHER_ID_STATIC;
+  try {
+    const ref = doc(db, 'teachers', tid, 'orders', order.id);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) { showToast('訂單不存在，請重新整理再試'); return; }
+    const data = snap.data();
+    const updatedCourses = (data.courses || []).map(c =>
+      c.courseId === course.id ? { ...c, leaveStatus: 'pending', leaveRequestedAt: new Date().toISOString() } : c
+    );
+    await updateDoc(ref, { courses: updatedCourses });
+    // 同步寫入學生端鏡射（跟訂單審核流程用同一個模式），確保重整後資料一致
+    try {
+      await updateDoc(doc(db, 'users', order.studentId, 'orders', order.id), { courses: updatedCourses });
+    } catch (syncErr) {
+      console.warn('學生端請假鏡射失敗（不影響老師端）', syncErr);
+    }
+    // 更新本地快取，畫面立即反映
+    order.courses = updatedCourses;
+    showToast('請假申請已送出，等待老師審核');
+    closeModal();
+    if (currentView === 'calendar') renderCalendar(); else renderList();
+  } catch (e) {
+    showToast('申請失敗，請再試一次');
+  }
 }
 
 function updateCartBtn() {
@@ -1856,7 +1928,9 @@ document.getElementById('googleLoginBtn').addEventListener('click', () => {
     try {
       const snap = await getDoc(doc(db, 'users', user.uid));
       const nickname = snap.exists() ? snap.data().nickname : null;
+      currentStudentCredits = snap.exists() ? (snap.data().remainingCredits || {}) : {};
       updateStudentBtn(nickname);
+      renderStudentCreditWrap();
     } catch(e) {
       updateStudentBtn();
     }
@@ -1918,6 +1992,7 @@ document.getElementById('studentLogoutConfirm').addEventListener('click', async 
   if (studentOrdersUnsubscribe) { studentOrdersUnsubscribe(); studentOrdersUnsubscribe = null; }
   currentStudent = null;
   studentOrders = [];
+  currentStudentCredits = {};
   sessionStorage.removeItem('loginRole');
   clearNotifications();
   updateStudentBtn();
@@ -3092,6 +3167,7 @@ function renderHomeSections() {
       teacherId = null;
       teacherName = null;
       studentOrders = [];
+      currentStudentCredits = {};
       clearNotifications();
       updateStudentBtn();
       updateTeacherBtn();
@@ -3126,7 +3202,9 @@ function renderHomeSections() {
       try {
         const snap = await getDoc(doc(db, 'users', user.uid));
         const nickname = snap.exists() ? snap.data().nickname : null;
+        currentStudentCredits = snap.exists() ? (snap.data().remainingCredits || {}) : {};
         updateStudentBtn(nickname);
+        renderStudentCreditWrap();
       } catch(e) {
         updateStudentBtn();
       }
@@ -3141,7 +3219,9 @@ function renderHomeSections() {
     try {
       const snap = await getDoc(doc(db, 'users', user.uid));
       const nickname = snap.exists() ? snap.data().nickname : null;
+      currentStudentCredits = snap.exists() ? (snap.data().remainingCredits || {}) : {};
       updateStudentBtn(nickname);
+      renderStudentCreditWrap();
     } catch(e) {
       updateStudentBtn();
     }

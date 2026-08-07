@@ -1765,6 +1765,61 @@ main { padding: 20px 16px 40px; max-width: 680px; margin: 0 auto; }
   white-space: nowrap;
   pointer-events: none;
 }
+.tag-leave {
+  display: inline-block;
+  background: none;
+  border: 1px solid #d19a5a;
+  color: #b57c3a;
+  border-radius: 20px;
+  padding: 3px 10px;
+  font-size: 0.72rem;
+  font-weight: 400;
+  font-family: 'Noto Sans TC', sans-serif;
+  white-space: nowrap;
+  pointer-events: none;
+}
+/* 學生下拉選單裡的剩餘堂數顯示 */
+.student-credit-wrap {
+  padding: 10px 16px;
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+}
+.student-credit-title {
+  font-size: 0.7rem;
+  color: var(--ink-soft, #999);
+  margin-bottom: 6px;
+}
+.student-credit-tag {
+  display: inline-block;
+  font-size: 0.75rem;
+  color: var(--brown-dark, #5a3d2e);
+  background: var(--latte-pale, #f5efe6);
+  border-radius: 20px;
+  padding: 3px 10px;
+  margin: 2px 4px 2px 0;
+  white-space: nowrap;
+}
+.student-credit-tag b { color: var(--rose, #c97b6d); font-weight: 700; }
+.student-credit-empty {
+  font-size: 0.75rem;
+  color: #bbb;
+  font-style: italic;
+}
+/* 學生端「申請請假」按鈕（訂單/課程 modal 用） */
+.btn-leave-request {
+  width: 100%;
+  padding: 12px;
+  margin-top: 8px;
+  background: none;
+  border: 1px solid #d19a5a;
+  color: #b57c3a;
+  border-radius: var(--radius);
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
+  text-align: center;
+}
+.btn-leave-request:hover { opacity: 0.75; }
 .order-empty-hint {
   padding: 32px 16px;
   text-align: center;
