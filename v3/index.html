@@ -124,7 +124,7 @@
 
 <!-- STUDENT DROPDOWN MENU -->
 <div class="student-dropdown" id="studentDropdown">
-  <div class="student-credit-wrap" id="studentCreditWrap"></div>
+  <button class="student-dropdown-item" id="studentCreditBtn">🎫 剩餘堂數</button>
   <button class="student-dropdown-item" id="studentProfileBtn">👤 個人資料</button>
   <button class="student-dropdown-item" id="studentLogoutBtn">🚪 登出</button>
 </div>
@@ -138,6 +138,16 @@
     <button class="btn-primary" id="studentLogoutConfirm" style="width:100%">登出</button>
     <br>
     <button class="login-cancel" id="studentLogoutCancel">取消</button>
+  </div>
+</div>
+
+<!-- STUDENT CREDIT OVERLAY -->
+<div class="login-overlay" id="studentCreditOverlay">
+  <div class="login-box">
+    <div style="font-size:2rem;margin-bottom:8px">🎫</div>
+    <h3>剩餘堂數</h3>
+    <div id="studentCreditList" style="margin:16px 0"></div>
+    <button class="login-cancel" id="studentCreditClose">關閉</button>
   </div>
 </div>
 

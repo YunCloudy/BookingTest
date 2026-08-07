@@ -309,17 +309,14 @@ async function getStudentCredits(tid, studentId) {
   }
 }
 
-// 學生端：把 currentStudentCredits 畫進登入下拉選單（v3.3 第二階段）
-function renderStudentCreditWrap() {
-  const wrap = document.getElementById('studentCreditWrap');
+// 學生端：把剩餘堂數畫進「🎫 剩餘堂數」卡片（v3.3 第二階段，改成獨立卡片，方便未來多老師擴充）
+function renderStudentCreditList(credits) {
+  const wrap = document.getElementById('studentCreditList');
   if (!wrap) return;
-  const entries = Object.entries(currentStudentCredits || {}).filter(([, v]) => v);
-  wrap.innerHTML = `
-    <div class="student-credit-title">剩餘堂數</div>
-    ${entries.length
-      ? entries.map(([pk, v]) => `<span class="student-credit-tag">${poolLabel(pk)} <b>${v}</b> 堂</span>`).join('')
-      : `<span class="student-credit-empty">目前沒有剩餘堂數</span>`}
-  `;
+  const entries = Object.entries(credits || {}).filter(([, v]) => v);
+  wrap.innerHTML = entries.length
+    ? `<div class="credit-tags" style="justify-content:center">${entries.map(([pk, v]) => `<span class="student-credit-tag">${poolLabel(pk)} <b>${v}</b> 堂</span>`).join('')}</div>`
+    : `<div class="student-credit-empty">目前沒有剩餘堂數</div>`;
 }
 
 // ── 共用堂數調整函式 ──
@@ -1930,7 +1927,6 @@ document.getElementById('googleLoginBtn').addEventListener('click', () => {
       const nickname = snap.exists() ? snap.data().nickname : null;
       currentStudentCredits = snap.exists() ? (snap.data().remainingCredits || {}) : {};
       updateStudentBtn(nickname);
-      renderStudentCreditWrap();
     } catch(e) {
       updateStudentBtn();
     }
@@ -1951,6 +1947,22 @@ document.getElementById('googleLoginBtn').addEventListener('click', () => {
 });
 
 // 個人資料
+// 🎫 剩餘堂數卡片
+document.getElementById('studentCreditBtn').addEventListener('click', async () => {
+  document.getElementById('studentDropdown').classList.remove('open');
+  document.getElementById('studentCreditList').innerHTML = '<div class="student-credit-empty">讀取中…</div>';
+  document.getElementById('studentCreditOverlay').classList.add('open');
+  try {
+    const snap = await getDoc(doc(db, 'users', currentStudent.uid));
+    currentStudentCredits = snap.exists() ? (snap.data().remainingCredits || {}) : {};
+  } catch(e) {}
+  renderStudentCreditList(currentStudentCredits);
+});
+
+document.getElementById('studentCreditClose').addEventListener('click', () => {
+  document.getElementById('studentCreditOverlay').classList.remove('open');
+});
+
 document.getElementById('studentProfileBtn').addEventListener('click', async () => {
   document.getElementById('studentDropdown').classList.remove('open');
   document.getElementById('studentProfileEmail').textContent = currentStudent.email || '';
@@ -3204,7 +3216,6 @@ function renderHomeSections() {
         const nickname = snap.exists() ? snap.data().nickname : null;
         currentStudentCredits = snap.exists() ? (snap.data().remainingCredits || {}) : {};
         updateStudentBtn(nickname);
-        renderStudentCreditWrap();
       } catch(e) {
         updateStudentBtn();
       }
@@ -3221,7 +3232,6 @@ function renderHomeSections() {
       const nickname = snap.exists() ? snap.data().nickname : null;
       currentStudentCredits = snap.exists() ? (snap.data().remainingCredits || {}) : {};
       updateStudentBtn(nickname);
-      renderStudentCreditWrap();
     } catch(e) {
       updateStudentBtn();
     }

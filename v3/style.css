@@ -1778,31 +1778,23 @@ main { padding: 20px 16px 40px; max-width: 680px; margin: 0 auto; }
   white-space: nowrap;
   pointer-events: none;
 }
-/* 學生下拉選單裡的剩餘堂數顯示 */
-.student-credit-wrap {
-  padding: 10px 16px;
-  border-bottom: 1px solid rgba(0,0,0,0.06);
-}
-.student-credit-title {
-  font-size: 0.7rem;
-  color: var(--ink-soft, #999);
-  margin-bottom: 6px;
-}
+/* 學生端「🎫 剩餘堂數」卡片內的堂數標籤 */
 .student-credit-tag {
   display: inline-block;
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   color: var(--brown-dark, #5a3d2e);
   background: var(--latte-pale, #f5efe6);
   border-radius: 20px;
-  padding: 3px 10px;
-  margin: 2px 4px 2px 0;
+  padding: 4px 12px;
+  margin: 3px;
   white-space: nowrap;
 }
 .student-credit-tag b { color: var(--rose, #c97b6d); font-weight: 700; }
 .student-credit-empty {
-  font-size: 0.75rem;
+  font-size: 0.85rem;
   color: #bbb;
   font-style: italic;
+  text-align: center;
 }
 /* 學生端「申請請假」按鈕（訂單/課程 modal 用） */
 .btn-leave-request {
