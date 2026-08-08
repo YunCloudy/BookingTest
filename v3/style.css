@@ -2222,13 +2222,21 @@ main { padding: 20px 16px 40px; max-width: 680px; margin: 0 auto; }
 }
 .roster-credit-apply:hover { opacity: 0.85; }
 .roster-credit-apply:disabled { opacity: 0.5; cursor: default; }
+.roster-panel-title {
+  font-size: 0.75rem;
+  color: #a08070;
+  font-weight: 600;
+}
+.roster-panel-divider {
+  border-top: 1px solid var(--mocha-light);
+  margin: 2px 0;
+}
 .roster-leave-toggle-row {
   display: flex;
-  border-top: 1px solid var(--mocha-light);
-  padding-top: 8px;
+  gap: 8px;
 }
 .roster-leave-toggle-btn {
-  width: 100%;
+  flex: 1;
   border: 1px solid #d9a441;
   border-radius: 6px;
   background: #fff;
@@ -2237,6 +2245,10 @@ main { padding: 20px 16px 40px; max-width: 680px; margin: 0 auto; }
   font-size: 0.8rem;
   cursor: pointer;
   font-family: inherit;
+}
+.roster-leave-toggle-btn.selected {
+  background: #d9a441;
+  color: #fff;
 }
 .roster-leave-toggle-btn:hover { opacity: 0.85; }
 .roster-leave-toggle-btn:disabled { opacity: 0.5; cursor: default; }

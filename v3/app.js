@@ -1003,16 +1003,18 @@ function buildRosterItemsHtml(course, list) {
         </div>
         ${b.studentId ? `
         <div class="roster-credit-form" id="rosterCreditForm_${i}" style="display:none">
+          <div class="roster-panel-title">手動調整未使用堂數</div>
           <div class="roster-credit-row">
             <select class="roster-credit-pool"><option>載入中…</option></select>
             <input class="roster-credit-total" type="number" value="0">
             <span class="roster-credit-unit">堂</span>
             <button class="roster-credit-apply" type="button" data-student-id="${b.studentId}" data-student-name="${b.name}">套用</button>
           </div>
+          <div class="roster-panel-divider"></div>
+          <div class="roster-panel-title">編輯報名狀態</div>
           <div class="roster-leave-toggle-row">
-            <button class="roster-leave-toggle-btn" type="button" data-idx="${i}" data-student-id="${b.studentId}" data-student-name="${b.name}">
-              ${b.onLeave ? '↩️ 取消請假標記' : '🙋 標記為已請假'}
-            </button>
+            <button type="button" class="roster-leave-toggle-btn ${!b.onLeave ? 'selected' : ''}" data-idx="${i}" data-value="enrolled">已報名</button>
+            <button type="button" class="roster-leave-toggle-btn ${b.onLeave ? 'selected' : ''}" data-idx="${i}" data-value="onleave">已請假</button>
           </div>
         </div>` : ''}`).join('');
 }
@@ -1119,37 +1121,28 @@ function bindModalRosterEvents(course) {
     });
   });
 
-  // ✍️面板：雙向切換「已請假／未請假」（v3.4）
-  // 標記已請假 = 這堂算請假，堂數池退回一堂（+1）；取消標記 = 改回正常出席，堂數池扣回去（-1）
-  // 名額本身不動（一直都在名單上），只是切換 booking.onLeave 這個欄位跟連動堂數
+  // ✍️面板：編輯報名狀態（v3.4，方案A：純狀態切換，不連動堂數）
+  // 已請假只是個標籤，堂數要調整請老師自己去上面「手動調整未使用堂數」填，
+  // 這樣切換的時候不用猜這次該退還是該扣，是最不容易按錯的設計
   document.querySelectorAll('.roster-leave-toggle-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
       const idx = Number(btn.dataset.idx);
+      const wantOnLeave = btn.dataset.value === 'onleave';
       const list = bookings[course.id] || [];
       const b = list[idx];
-      if (!b) return;
-      const turningOn = !b.onLeave;
-      const poolKey = getPoolKey(course);
-      const delta = turningOn ? 1 : -1;
+      if (!b || b.onLeave === wantOnLeave) return; // 已經是這個狀態，不用動作
 
-      btn.disabled = true; btn.textContent = '處理中…';
+      const group = btn.parentElement;
+      group.querySelectorAll('.roster-leave-toggle-btn').forEach(x => x.disabled = true);
       try {
-        if (poolKey) {
-          const updatedCredits = await adjustCredits(tid, b.studentId, b.name, poolKey, delta);
-          if (!turningOn && updatedCredits && (updatedCredits[poolKey] || 0) < 0) {
-            showToast(`已取消請假標記，但${poolLabel(poolKey)}目前變成負數，記得留意`);
-          }
-        }
-        b.onLeave = turningOn;
+        b.onLeave = wantOnLeave;
         bookings[course.id] = list;
         await saveToStorage();
-        if (turningOn) showToast('已標記為已請假');
-        else if (!poolKey) showToast('已取消請假標記');
+        showToast(wantOnLeave ? '已標記為已請假' : '已改回已報名');
         openModal(course);
       } catch (e) {
         showToast('切換失敗，請再試一次');
-        btn.disabled = false;
-        btn.textContent = turningOn ? '🙋 標記為已請假' : '↩️ 取消請假標記';
+        group.querySelectorAll('.roster-leave-toggle-btn').forEach(x => x.disabled = false);
       }
     });
   });
@@ -1456,11 +1449,20 @@ function loadStudentOrders(uid) {
   });
 }
 
-// 該課程已有「confirmed」的訂單 → 顯示「已報名」標籤
+// 該課程有這位學生的報名紀錄、且沒有標記請假 → 顯示「已報名」標籤
+// v3.4：改成直接讀 bookings（跟老師端✍️面板、學生名單同一份資料），不再看訂單，
+// 這樣不管是走正式請假審核、還是老師直接手動切換狀態，學生端都會同步對，不會有兩套資料互相打架
 function isEnrolled(courseId) {
-  return studentOrders.some(o =>
-    o.courses?.some(c => c.courseId === courseId && c.result === 'confirmed')
-  );
+  if (!currentStudent) return false;
+  const b = (bookings[courseId] || []).find(x => x.studentId === currentStudent.uid);
+  return !!b && !b.onLeave;
+}
+
+// 該課程有這位學生的報名紀錄、且已標記請假 → 卡片顯示「已請假」而不是「已報名」
+function hasApprovedDeductLeave(courseId) {
+  if (!currentStudent) return false;
+  const b = (bookings[courseId] || []).find(x => x.studentId === currentStudent.uid);
+  return !!b && !!b.onLeave;
 }
 
 // 該課程有「pending」的訂單 → 顯示「審核中」標籤，同時擋重複加入
@@ -1471,18 +1473,13 @@ function hasPendingOrder(courseId) {
 }
 
 // 該課程已送出請假申請、等待老師審核（v3.3 第三階段）
+// 這個還是查訂單：申請中代表老師還沒定案，尚未反映到 booking 上，booking 這時候還是正常報名狀態
 function hasPendingLeave(courseId) {
   return studentOrders.some(o =>
     o.courses?.some(c => c.courseId === courseId && c.leaveStatus === 'pending')
   );
 }
 
-// 該課程請假已審核完成、老師選擇「扣堂」→ 卡片顯示「已請假」而不是「已報名」（v3.3 第四階段）
-function hasApprovedDeductLeave(courseId) {
-  return studentOrders.some(o =>
-    o.courses?.some(c => c.courseId === courseId && c.leaveStatus === 'approved_deduct')
-  );
-}
 
 // 找出這個學生「已報名、可以申請請假」的那筆訂單（confirmed 且尚未有請假申請）
 function findLeaveableOrder(courseId) {
@@ -3337,18 +3334,27 @@ function renderAdmin() {
           const delta = deltaRaw === '' ? 0 : Number(deltaRaw);
           if (isNaN(delta)) { showToast('堂數異動請輸入數字'); return; }
 
+          const order = item.order;
+          const cOld = order.courses[courseIdx];
+          const courseObj = courses.find(cs => cs.id === cOld.courseId) || { title: cOld.title };
+          const poolKey = getPoolKey(courseObj);
+
           // 防呆：如果整組（是/否切換、數字欄）從打開表單到現在完全沒被動過，跳確認框再送出
           if (deltaInputEl.dataset.touched !== 'true') {
             if (!confirm(`堂數異動維持系統預設值 ${delta} 堂，確定送出嗎？`)) return;
           }
 
+          // 防呆：這次異動會讓堂數變成負數的話，送出前先跳確認框擋一下，不要事後才發現
+          if (poolKey && delta) {
+            const currentCredits = await getStudentCredits(tid, order.studentId);
+            const resultTotal = (currentCredits[poolKey] || 0) + delta;
+            if (resultTotal < 0) {
+              if (!confirm(`這次異動會讓「${order.studentName}」的${poolLabel(poolKey)}變成 ${resultTotal} 堂（負數），確定要送出嗎？`)) return;
+            }
+          }
+
           btn.textContent = '儲存中…'; btn.disabled = true;
           try {
-            const order = item.order;
-            const cOld = order.courses[courseIdx];
-            const courseObj = courses.find(cs => cs.id === cOld.courseId) || { title: cOld.title };
-            const poolKey = getPoolKey(courseObj);
-
             // 堂數異動（0 的話 adjustCredits 內部會自動跳過，不用另外判斷）
             if (poolKey && delta) {
               await adjustCredits(tid, order.studentId, order.studentName, poolKey, delta);
