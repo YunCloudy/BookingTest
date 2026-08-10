@@ -510,12 +510,12 @@ function isAdmin() {
   return currentTeacher !== null && teacherId !== null;
 }
 
-// 取消原因代碼轉成顯示文字（v3.4）
+// 停課原因代碼轉成顯示文字（v3.4）
 function courseCancelReasonLabel(c) {
   if (c.cancelReason === 'understaffed') return '人數不足';
   if (c.cancelReason === 'weather') return '颱風停課';
   if (c.cancelReason === 'other') return c.cancelReasonText || '其他原因';
-  return '已取消';
+  return '已停課';
 }
 
 // 取消整堂課：批次退回所有已報名學生的堂數、清空名額、標記課程狀態、批次通知（v3.4）
@@ -555,7 +555,7 @@ async function cancelCourseWithRefund(c, reasonCode, reasonText, reasonLabel) {
     try {
       await pushNotification('users', b.studentId, {
         type: 'course_cancelled',
-        message: `「${c.title}」（${c.date} ${c.time}）因${reasonLabel}取消，堂數已退回`,
+        message: `「${c.title}」（${c.date} ${c.time}）因${reasonLabel}停課，堂數已退回`,
         detail: `${c.title} ${c.date}${c.time}`
       });
     } catch (e) { /* 通知失敗不要卡住整批 */ }
@@ -570,7 +570,7 @@ async function cancelCourseWithRefund(c, reasonCode, reasonText, reasonLabel) {
 }
 
 function buildSpotsHtml(state, remaining, maxSpots, course) {
-  if (state === 'cancelled') return `<div class="spots-num full-text">已取消</div><div class="spots-label">${course ? courseCancelReasonLabel(course) : ''}</div>`;
+  if (state === 'cancelled') return `<div class="spots-num full-text">已停課</div><div class="spots-label">${course ? courseCancelReasonLabel(course) : ''}</div>`;
   if (state === 'closed')  return `<div class="spots-num full-text">報名<br>已關閉</div>`;
   if (state === 'full')    return `<div class="spots-num full-text">已滿班</div><div class="spots-label">(${maxSpots}人滿班)</div>`;
   if (state === 'pending') return `<div class="spots-num full-text" style="font-size:0.85rem">待開班</div><div class="spots-label">餘 ${remaining} 位</div>`;
@@ -647,8 +647,9 @@ function renderList() {
           <button class="edit-toggle-btn" id="ccopy_${c.id}">📋 複製</button>
           <button class="edit-toggle-btn" id="cdelete_${c.id}">🗑️ 刪除</button>
           ${c.cancelled
-            ? `<button class="edit-toggle-btn course-reopen-btn" id="creopen_${c.id}">🔄 恢復開放</button>`
-            : `<button class="edit-toggle-btn course-cancel-btn" id="ccancel_${c.id}">🚫 取消這堂課</button>`}
+            ? `<button class="edit-toggle-btn course-reopen-btn" id="creopen_${c.id}">🔄 恢復</button>`
+            : `<button class="edit-toggle-btn course-cancel-btn" id="ccancel_${c.id}">⛔ 停課</button>`}
+          <button class="edit-toggle-btn course-remind-btn" id="cremind_${c.id}">📣 提醒</button>
         </div>` : ''}
       </div>
       <div class="card-spots">
@@ -674,7 +675,7 @@ function renderList() {
       cancelPanel.id = `cancelPanel_${c.id}`;
       cancelPanel.style.display = 'none';
       cancelPanel.innerHTML = `
-        <div class="order-cancel-reason-label">取消原因（會全額退回所有已報名學生的堂數並發送通知）</div>
+        <div class="order-cancel-reason-label">停課原因（會全額退回所有已報名學生的堂數並發送通知）</div>
         <div class="order-cancel-reason-btns">
           ${COURSE_CANCEL_REASONS.map(r => `<button type="button" class="order-reason-btn course-cancel-reason-btn" data-code="${r.code}">${r.label}</button>`).join('')}
         </div>
@@ -701,23 +702,23 @@ function renderList() {
           const code = btn.dataset.code;
           let reasonText = '';
           if (code === 'other') {
-            reasonText = prompt('請輸入取消原因：') || '';
+            reasonText = prompt('請輸入停課原因：') || '';
             if (!reasonText.trim()) return; // 沒填就不繼續，維持面板開著讓老師重選
           }
           const label = code === 'understaffed' ? '人數不足未開班' : code === 'weather' ? '颱風停課' : reasonText;
           const bookedCount = (bookings[c.id] || []).length;
           const confirmMsg = bookedCount > 0
-            ? `確定要取消「${c.title}」（${c.date} ${c.time}）嗎？\n將會退回 ${bookedCount} 位已報名學生的堂數、清空名額，並發送通知。此操作無法自動復原。`
-            : `確定要取消「${c.title}」（${c.date} ${c.time}）嗎？目前沒有已報名學生。`;
+            ? `確定要停課「${c.title}」（${c.date} ${c.time}）嗎？\n將會退回 ${bookedCount} 位已報名學生的堂數、清空名額，並發送通知。此操作無法自動復原。`
+            : `確定要停課「${c.title}」（${c.date} ${c.time}）嗎？目前沒有已報名學生。`;
           if (!confirm(confirmMsg)) return;
 
           btn.disabled = true; btn.textContent = '處理中…';
           try {
             await cancelCourseWithRefund(c, code, reasonText, label);
-            showToast(`已取消「${c.title}」`);
+            showToast(`已停課「${c.title}」`);
             if (currentView === 'calendar') renderCalendar(); else renderList();
           } catch (err) {
-            showToast('取消失敗，請再試一次');
+            showToast('停課失敗，請再試一次');
             btn.disabled = false; btn.textContent = COURSE_CANCEL_REASONS.find(r => r.code === code).label;
           }
         });
@@ -727,7 +728,7 @@ function renderList() {
       if (reopenBtnEl) {
         reopenBtnEl.addEventListener('click', async (e) => {
           e.stopPropagation();
-          if (!confirm(`確定要恢復「${c.title}」嗎？（只會解除取消標記，不會自動復原原本的報名名單）`)) return;
+          if (!confirm(`確定要恢復「${c.title}」嗎？（只會解除停課標記，不會自動復原原本的報名名單）`)) return;
           c.cancelled = false;
           c.cancelReason = '';
           c.cancelReasonText = '';
@@ -815,7 +816,6 @@ function renderList() {
             <button class="save-announce" id="csaveSmall_${c.id}">儲存備註</button>
           </div>
           <button class="save-announce cei-save-main" id="csaveCourse_${c.id}">儲存</button>
-          <button class="edit-toggle-btn course-remind-btn" id="cremind_${c.id}" style="margin-top:6px">📣 發送開課提醒</button>
           <div class="roster-list">
             <div class="roster-section-title">
               已報名學員（${bookedList.length} 人）
@@ -895,7 +895,7 @@ function renderList() {
 
       // 開課提醒：手動按鈕，老師自己抓時間發，把目前名單狀態（已報名/已請假）一次通知給這堂課所有已登入學生
       // 沒有做成自動排程是因為這個 app 純前端＋Firestore，沒有 Cloud Functions，做不到真正的定時推播
-      editSection.querySelector(`#cremind_${c.id}`).addEventListener('click', async (e) => {
+      card.querySelector(`#cremind_${c.id}`).addEventListener('click', async (e) => {
         e.stopPropagation();
         const list = bookings[c.id] || [];
         const targets = list.filter(b => b.studentId);
@@ -916,7 +916,7 @@ function renderList() {
         } catch (err) {
           showToast('發送失敗，請再試一次');
         }
-        btn.disabled = false; btn.textContent = '📣 發送開課提醒';
+        btn.disabled = false; btn.textContent = '📣 提醒';
       });
 
 
@@ -979,7 +979,7 @@ function renderList() {
     .filter(c => { const s = courseStatus(c).state; return s === 'open' || s === 'pending'; })
     .sort((a, b) => a.dateStr.localeCompare(b.dateStr)),
   ...courses
-    .filter(c => { const s = courseStatus(c).state; return s === 'full' || s === 'closed'; })
+    .filter(c => { const s = courseStatus(c).state; return s === 'full' || s === 'closed' || s === 'cancelled'; })
     .sort((a, b) => a.dateStr.localeCompare(b.dateStr)),
     ];
 
@@ -997,7 +997,7 @@ function renderList() {
     .filter(c => { const s = courseStatus(c).state; return s === 'open' || s === 'pending'; })
     .sort((a, b) => a.dateStr.localeCompare(b.dateStr)),
   ...catCourses
-    .filter(c => { const s = courseStatus(c).state; return s === 'full' || s === 'closed'; })
+    .filter(c => { const s = courseStatus(c).state; return s === 'full' || s === 'closed' || s === 'cancelled'; })
     .sort((a, b) => a.dateStr.localeCompare(b.dateStr)),
 ];
 
@@ -1111,7 +1111,7 @@ function renderDayDetail(dateStr, dayCourses) {
     const { state, remaining } = courseStatus(c);
     const isFull = state === 'closed' || state === 'full' || state === 'cancelled';
     const dotColor = state === 'open' ? 'var(--rose)' : state === 'pending' ? 'var(--gold)' : '#ccc';
-    const spotsText = state === 'cancelled' ? `已取消・${courseCancelReasonLabel(c)}` : state === 'closed' ? '已關閉' : state === 'full' ? '已滿班' : state === 'pending' ? `待開班・餘 ${remaining} 位` : `餘 ${remaining} 位`;
+    const spotsText = state === 'cancelled' ? `已停課・${courseCancelReasonLabel(c)}` : state === 'closed' ? '已關閉' : state === 'full' ? '已滿班' : state === 'pending' ? `待開班・餘 ${remaining} 位` : `餘 ${remaining} 位`;
     const dciTag = (!isAdmin() && hasPendingLeave(c.id)) ? '<span class="tag-leave">🙋 請假申請中</span>'
                  : (!isAdmin() && hasApprovedDeductLeave(c.id)) ? '<span class="tag-leave-done">🙋 已請假</span>'
                  : (!isAdmin() && isEnrolled(c.id)) ? '<span class="tag-enrolled">✓ 已報名</span>'
