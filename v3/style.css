@@ -1925,6 +1925,27 @@ main { padding: 20px 16px 40px; max-width: 680px; margin: 0 auto; }
   font-family: inherit;
 }
 .credit-manual-toggle:hover { opacity: 0.85; }
+.credit-zero-btn {
+  background: transparent;
+  border: 1px dashed #c88b8b;
+  color: #c88b8b;
+  border-radius: 20px;
+  padding: 5px 12px;
+  font-size: 0.76rem;
+  cursor: pointer;
+  font-family: inherit;
+}
+.credit-zero-btn:hover { opacity: 0.85; }
+.credit-zero-btn:disabled { opacity: 0.5; cursor: default; }
+.course-cancel-btn { border-color: #c88b8b !important; color: #c88b8b !important; }
+.course-reopen-btn { border-color: #6b9c7a !important; color: #6b9c7a !important; }
+.course-cancel-panel {
+  margin-top: 6px;
+  padding: 10px;
+}
+.course-cancel-actions {
+  margin-top: 8px;
+}
 .credit-manual-form {
   display: flex;
   align-items: center;

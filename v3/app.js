@@ -510,7 +510,67 @@ function isAdmin() {
   return currentTeacher !== null && teacherId !== null;
 }
 
-function buildSpotsHtml(state, remaining, maxSpots) {
+// 取消原因代碼轉成顯示文字（v3.4）
+function courseCancelReasonLabel(c) {
+  if (c.cancelReason === 'understaffed') return '人數不足';
+  if (c.cancelReason === 'weather') return '颱風停課';
+  if (c.cancelReason === 'other') return c.cancelReasonText || '其他原因';
+  return '已取消';
+}
+
+// 取消整堂課：批次退回所有已報名學生的堂數、清空名額、標記課程狀態、批次通知（v3.4）
+// 取消永遠發生在開課前（人數不足 or 颱風停課提早公告），不用處理「已經上過的課被取消」的情況，邏輯可以單純點
+async function cancelCourseWithRefund(c, reasonCode, reasonText, reasonLabel) {
+  const tid = teacherId || TEACHER_ID_STATIC;
+  const list = bookings[c.id] || [];
+  const poolKey = getPoolKey(c);
+
+  for (const b of list) {
+    if (!b.studentId) continue; // 訪客手動報名沒有帳號，沒有堂數池可退，也沒地方發通知
+    try {
+      if (poolKey) {
+        await adjustCredits(tid, b.studentId, b.name, poolKey, 1);
+      }
+    } catch (e) { /* 單一學生退堂失敗不要卡住整批，繼續處理下一位 */ }
+
+    // 如果這位是走訂單系統報名的，訂單裡這堂課也同步標成取消，狀態才會一致
+    if (b.orderId) {
+      try {
+        const orderSnap = await getDoc(doc(db, 'teachers', tid, 'orders', b.orderId));
+        if (orderSnap.exists()) {
+          const orderData = orderSnap.data();
+          const updatedCourses = (orderData.courses || []).map(x =>
+            x.courseId === c.id ? { ...x, result: 'cancelled' } : x
+          );
+          const allCancelled = updatedCourses.every(x => x.result === 'cancelled');
+          const newStatus = allCancelled ? 'cancelled' : 'confirmed';
+          await updateDoc(doc(db, 'teachers', tid, 'orders', b.orderId), { courses: updatedCourses, status: newStatus });
+          try {
+            await updateDoc(doc(db, 'users', b.studentId, 'orders', b.orderId), { courses: updatedCourses, status: newStatus });
+          } catch (syncErr) { /* 學生端同步失敗不影響老師端主流程 */ }
+        }
+      } catch (e) { /* 訂單同步失敗不要卡住整批 */ }
+    }
+
+    try {
+      await pushNotification('users', b.studentId, {
+        type: 'course_cancelled',
+        message: `「${c.title}」（${c.date} ${c.time}）因${reasonLabel}取消，堂數已退回`,
+        detail: `${c.title} ${c.date}${c.time}`
+      });
+    } catch (e) { /* 通知失敗不要卡住整批 */ }
+  }
+
+  bookings[c.id] = [];
+  c.cancelled = true;
+  c.cancelReason = reasonCode;
+  c.cancelReasonText = reasonCode === 'other' ? reasonText : '';
+  c.cancelledAt = new Date().toISOString();
+  await saveToStorage();
+}
+
+function buildSpotsHtml(state, remaining, maxSpots, course) {
+  if (state === 'cancelled') return `<div class="spots-num full-text">已取消</div><div class="spots-label">${course ? courseCancelReasonLabel(course) : ''}</div>`;
   if (state === 'closed')  return `<div class="spots-num full-text">報名<br>已關閉</div>`;
   if (state === 'full')    return `<div class="spots-num full-text">已滿班</div><div class="spots-label">(${maxSpots}人滿班)</div>`;
   if (state === 'pending') return `<div class="spots-num full-text" style="font-size:0.85rem">待開班</div><div class="spots-label">餘 ${remaining} 位</div>`;
@@ -539,6 +599,7 @@ function catLabel(catId) {
 //   pending → 報名人數未達開班門檻 minSpots（待開班）
 //   open    → 正常開放報名
 function courseStatus(c) {
+  if (c.cancelled) return { state: 'cancelled', remaining: 0 };
   if (!c.open) return { state: 'closed', remaining: 0 };
   const booked   = (bookings[c.id] || []).length;
   const maxSpots = c.maxSpots || 6;
@@ -556,12 +617,12 @@ function renderList() {
 
   function buildCard(c) {
     const { state, remaining } = courseStatus(c);
-    const isFull = state === 'full' || state === 'closed';
+    const isFull = state === 'full' || state === 'closed' || state === 'cancelled';
     const dotClass = state === 'open'    ? 'dot-available'
                    : state === 'pending' ? 'dot-few'
                    : 'dot-full';
 
-    let spotsHtml = buildSpotsHtml(state, remaining, c.maxSpots);
+    let spotsHtml = buildSpotsHtml(state, remaining, c.maxSpots, c);
 
     // 學生端：已報名 / 審核中 / 請假申請中 / 已請假 標籤
     const leaveTag     = (!isAdmin() && hasPendingLeave(c.id)) ? '<span class="tag-leave">🙋 請假申請中</span>' : '';
@@ -581,7 +642,14 @@ function renderList() {
         <div class="card-date">${c.date} ${c.time}</div>
         <div class="card-title">${c.title}</div>
         <div class="card-location">📍 ${c.location}</div>
-        ${isAdmin() ? `<div style="display:flex;gap:6px;margin-top:4px"><button class="edit-toggle-btn" id="cardEditBtn_${c.id}">✏️ 編輯</button><button class="edit-toggle-btn" id="ccopy_${c.id}">📋 複製</button><button class="edit-toggle-btn" id="cdelete_${c.id}">🗑️ 刪除</button></div>` : ''}
+        ${isAdmin() ? `<div style="display:flex;gap:6px;margin-top:4px;flex-wrap:wrap">
+          <button class="edit-toggle-btn" id="cardEditBtn_${c.id}">✏️ 編輯</button>
+          <button class="edit-toggle-btn" id="ccopy_${c.id}">📋 複製</button>
+          <button class="edit-toggle-btn" id="cdelete_${c.id}">🗑️ 刪除</button>
+          ${c.cancelled
+            ? `<button class="edit-toggle-btn course-reopen-btn" id="creopen_${c.id}">🔄 恢復開放</button>`
+            : `<button class="edit-toggle-btn course-cancel-btn" id="ccancel_${c.id}">🚫 取消這堂課</button>`}
+        </div>` : ''}
       </div>
       <div class="card-spots">
         ${statusTag ? `<div class="card-status-tag">${statusTag}</div>` : ''}
@@ -596,6 +664,79 @@ function renderList() {
 
     if (isAdmin()) {
       const bookedList = bookings[c.id];
+      const COURSE_CANCEL_REASONS = [
+        { code: 'understaffed', label: '人數不足' },
+        { code: 'weather', label: '颱風停課' },
+        { code: 'other', label: '其他' }
+      ];
+      const cancelPanel = document.createElement('div');
+      cancelPanel.className = 'admin-card course-cancel-panel';
+      cancelPanel.id = `cancelPanel_${c.id}`;
+      cancelPanel.style.display = 'none';
+      cancelPanel.innerHTML = `
+        <div class="order-cancel-reason-label">取消原因（會全額退回所有已報名學生的堂數並發送通知）</div>
+        <div class="order-cancel-reason-btns">
+          ${COURSE_CANCEL_REASONS.map(r => `<button type="button" class="order-reason-btn course-cancel-reason-btn" data-code="${r.code}">${r.label}</button>`).join('')}
+        </div>
+        <div class="course-cancel-actions">
+          <button type="button" class="order-btn-cancel course-cancel-back-btn">返回</button>
+        </div>
+      `;
+      wrapper.appendChild(cancelPanel);
+
+      const cancelBtnEl = card.querySelector(`#ccancel_${c.id}`);
+      if (cancelBtnEl) {
+        cancelBtnEl.addEventListener('click', (e) => {
+          e.stopPropagation();
+          cancelPanel.style.display = 'block';
+        });
+      }
+      cancelPanel.querySelector('.course-cancel-back-btn').addEventListener('click', (e) => {
+        e.stopPropagation();
+        cancelPanel.style.display = 'none';
+      });
+      cancelPanel.querySelectorAll('.course-cancel-reason-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          const code = btn.dataset.code;
+          let reasonText = '';
+          if (code === 'other') {
+            reasonText = prompt('請輸入取消原因：') || '';
+            if (!reasonText.trim()) return; // 沒填就不繼續，維持面板開著讓老師重選
+          }
+          const label = code === 'understaffed' ? '人數不足未開班' : code === 'weather' ? '颱風停課' : reasonText;
+          const bookedCount = (bookings[c.id] || []).length;
+          const confirmMsg = bookedCount > 0
+            ? `確定要取消「${c.title}」（${c.date} ${c.time}）嗎？\n將會退回 ${bookedCount} 位已報名學生的堂數、清空名額，並發送通知。此操作無法自動復原。`
+            : `確定要取消「${c.title}」（${c.date} ${c.time}）嗎？目前沒有已報名學生。`;
+          if (!confirm(confirmMsg)) return;
+
+          btn.disabled = true; btn.textContent = '處理中…';
+          try {
+            await cancelCourseWithRefund(c, code, reasonText, label);
+            showToast(`已取消「${c.title}」`);
+            if (currentView === 'calendar') renderCalendar(); else renderList();
+          } catch (err) {
+            showToast('取消失敗，請再試一次');
+            btn.disabled = false; btn.textContent = COURSE_CANCEL_REASONS.find(r => r.code === code).label;
+          }
+        });
+      });
+
+      const reopenBtnEl = card.querySelector(`#creopen_${c.id}`);
+      if (reopenBtnEl) {
+        reopenBtnEl.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          if (!confirm(`確定要恢復「${c.title}」嗎？（只會解除取消標記，不會自動復原原本的報名名單）`)) return;
+          c.cancelled = false;
+          c.cancelReason = '';
+          c.cancelReasonText = '';
+          await saveToStorage();
+          showToast(`已恢復「${c.title}」`);
+          if (currentView === 'calendar') renderCalendar(); else renderList();
+        });
+      }
+
       const editSection = document.createElement('div');
       editSection.id = `cardEdit_${c.id}`;
       editSection.className = 'card-edit-section hidden';
@@ -674,6 +815,7 @@ function renderList() {
             <button class="save-announce" id="csaveSmall_${c.id}">儲存備註</button>
           </div>
           <button class="save-announce cei-save-main" id="csaveCourse_${c.id}">儲存</button>
+          <button class="edit-toggle-btn course-remind-btn" id="cremind_${c.id}" style="margin-top:6px">📣 發送開課提醒</button>
           <div class="roster-list">
             <div class="roster-section-title">
               已報名學員（${bookedList.length} 人）
@@ -749,6 +891,32 @@ function renderList() {
       editSection.querySelector(`#showRosterToggle_${c.id}`).addEventListener('change', function() {
         c.showRoster = this.checked;
         document.getElementById(`showRosterLabel_${c.id}`).textContent = c.showRoster ? '學員可見' : '學員不可見';
+      });
+
+      // 開課提醒：手動按鈕，老師自己抓時間發，把目前名單狀態（已報名/已請假）一次通知給這堂課所有已登入學生
+      // 沒有做成自動排程是因為這個 app 純前端＋Firestore，沒有 Cloud Functions，做不到真正的定時推播
+      editSection.querySelector(`#cremind_${c.id}`).addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const list = bookings[c.id] || [];
+        const targets = list.filter(b => b.studentId);
+        if (targets.length === 0) { showToast('這堂課目前沒有已登入學生可以通知'); return; }
+        if (!confirm(`確定要發送開課提醒給「${c.title}」（${c.date} ${c.time}）目前 ${targets.length} 位已登入學生嗎？`)) return;
+        const btn = e.target;
+        btn.disabled = true; btn.textContent = '發送中…';
+        try {
+          for (const b of targets) {
+            const statusText = b.onLeave ? '已請假' : '已報名';
+            await pushNotification('users', b.studentId, {
+              type: 'course_reminder',
+              message: `開課提醒：「${c.title}」（${c.date} ${c.time}）你目前的狀態是「${statusText}」`,
+              detail: `${c.title} ${c.date}${c.time}`
+            });
+          }
+          showToast(`已發送提醒給 ${targets.length} 位學生`);
+        } catch (err) {
+          showToast('發送失敗，請再試一次');
+        }
+        btn.disabled = false; btn.textContent = '📣 發送開課提醒';
       });
 
 
@@ -941,9 +1109,9 @@ function renderDayDetail(dateStr, dayCourses) {
   let html = `<div class="day-detail"><div class="day-detail-title">📅 ${label} 的課程</div>`;
   dayCourses.forEach(c => {
     const { state, remaining } = courseStatus(c);
-    const isFull = state === 'closed' || state === 'full';
+    const isFull = state === 'closed' || state === 'full' || state === 'cancelled';
     const dotColor = state === 'open' ? 'var(--rose)' : state === 'pending' ? 'var(--gold)' : '#ccc';
-    const spotsText = state === 'closed' ? '已關閉' : state === 'full' ? '已滿班' : state === 'pending' ? `待開班・餘 ${remaining} 位` : `餘 ${remaining} 位`;
+    const spotsText = state === 'cancelled' ? `已取消・${courseCancelReasonLabel(c)}` : state === 'closed' ? '已關閉' : state === 'full' ? '已滿班' : state === 'pending' ? `待開班・餘 ${remaining} 位` : `餘 ${remaining} 位`;
     const dciTag = (!isAdmin() && hasPendingLeave(c.id)) ? '<span class="tag-leave">🙋 請假申請中</span>'
                  : (!isAdmin() && hasApprovedDeductLeave(c.id)) ? '<span class="tag-leave-done">🙋 已請假</span>'
                  : (!isAdmin() && isEnrolled(c.id)) ? '<span class="tag-enrolled">✓ 已報名</span>'
@@ -1309,7 +1477,7 @@ function bindModalRosterEvents(course) {
 function openModal(course) {
   currentCourse = course;
   const { state, remaining } = courseStatus(course);
-  const isFull = state === 'full' || state === 'closed';
+  const isFull = state === 'full' || state === 'closed' || state === 'cancelled';
   const isPending = state === 'pending';
 
   // 中公告 + 小公告
@@ -3511,7 +3679,10 @@ function renderAdmin() {
               : `<span class="credit-tag credit-tag-empty">尚無未用堂數</span>`}
           </div>
           <div class="credit-manual-wrap" data-student-id="${s.studentId}" data-student-name="${s.studentName}">
-            <button class="credit-manual-toggle" type="button">✍️手動調整堂數</button>
+            <div style="display:flex; gap:8px;">
+              <button class="credit-manual-toggle" type="button">✍️手動調整堂數</button>
+              <button class="credit-zero-btn" type="button" data-student-id="${s.studentId}" data-student-name="${s.studentName}">歸零</button>
+            </div>
             <div class="credit-manual-form" style="display:none">
               <select class="credit-manual-pool">
                 ${allPoolKeys().map(pk => `<option value="${pk}" data-current="${credits[pk] || 0}">${poolLabel(pk)}</option>`).join('')}
@@ -3525,9 +3696,33 @@ function renderAdmin() {
         listWrap.appendChild(card);
       });
 
+      // 堂數歸零（測試用）：把該學生「所有」有紀錄的堂數池一次設為 0
+      listWrap.querySelectorAll('.credit-zero-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const studentId = btn.dataset.studentId;
+          const studentName = btn.dataset.studentName;
+          if (!confirm(`確定要把「${studentName}」所有堂數池都歸零嗎？此操作無法復原。`)) return;
+          const student = studentList.find(s => s.studentId === studentId);
+          const poolKeys = Object.keys((student && student.remainingCredits) || {});
+          if (poolKeys.length === 0) { showToast('這位學生本來就沒有堂數'); return; }
+          btn.textContent = '處理中…'; btn.disabled = true;
+          try {
+            const tid2 = teacherId || TEACHER_ID_STATIC;
+            for (const pk of poolKeys) {
+              await setCredits(tid2, studentId, studentName, pk, 0);
+            }
+            showToast(`已將「${studentName}」所有堂數歸零`);
+            renderStudentSection();
+          } catch (e) {
+            showToast('操作失敗，請再試一次');
+            btn.textContent = '歸零'; btn.disabled = false;
+          }
+        });
+      });
+
       listWrap.querySelectorAll('.credit-manual-toggle').forEach(btn => {
         btn.addEventListener('click', () => {
-          const form = btn.nextElementSibling;
+          const form = btn.closest('.credit-manual-wrap').querySelector('.credit-manual-form');
           const isOpen = form.style.display !== 'none';
           form.style.display = isOpen ? 'none' : 'flex';
         });
