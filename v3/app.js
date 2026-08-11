@@ -1500,7 +1500,7 @@ function openModal(course) {
     ${announceHtml}
     <div class="spots-display">
       <div class="spots-big ${isFull ? 'zero' : ''}">${isFull ? '✕' : remaining}</div>
-      <div class="spots-sub">${isFull ? '本堂已滿班' : isPending ? `待開班・共${course.maxSpots}人` : `剩餘名額（共${course.maxSpots}人）`}</div>
+      <div class="spots-sub">${state === 'cancelled' ? `本堂已停課・${courseCancelReasonLabel(course)}` : state === 'closed' ? '本堂報名已關閉' : isFull ? '本堂已滿班' : isPending ? `待開班・共${course.maxSpots}人` : `剩餘名額（共${course.maxSpots}人）`}</div>
     </div>
     ${course.showRoster && !isAdmin() ? (() => {
   const roster = bookings[course.id] || [];
@@ -1534,7 +1534,7 @@ ${isAdmin() ? renderModalRoster(course) : (hasPendingLeave(course.id) ? `
         : '<button class="btn-cart" id="addToCartBtn">🛒 加入購物車</button>'
       }
     </div>` : `
-    <div class="full-notice">本班已額滿，如有需要請向老師詢問候補 🙏</div>
+    <div class="full-notice">${state === 'cancelled' ? `本堂已停課（${courseCancelReasonLabel(course)}），已報名學生的堂數已全額退回` : '本班已額滿，如有需要請向老師詢問候補 🙏'}</div>
     `)}
     <button class="btn-close" id="closeModalBtn">關閉</button>
   `;
