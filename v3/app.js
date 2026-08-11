@@ -573,7 +573,13 @@ function buildSpotsHtml(state, remaining, maxSpots, course) {
   if (state === 'cancelled') return `<div class="spots-num full-text">已停課</div><div class="spots-label">${course ? courseCancelReasonLabel(course) : ''}</div>`;
   if (state === 'closed')  return `<div class="spots-num full-text">報名<br>已關閉</div>`;
   if (state === 'full')    return `<div class="spots-num full-text">已滿班</div><div class="spots-label">(${maxSpots}人滿班)</div>`;
-  if (state === 'pending') return `<div class="spots-num full-text" style="font-size:0.85rem">待開班</div><div class="spots-label">餘 ${remaining} 位</div>`;
+  if (state === 'pending') {
+    // 老師端 0 人報名時特別標「尚無報名」，方便掃過列表就知道哪堂該去發開課通知，不用一堂堂點開看
+    // 學生端一律顯示餘位數字，不特別強調人數，避免看到空班反而猶豫要不要報
+    const bookedCount = maxSpots - remaining;
+    const label = (isAdmin() && bookedCount === 0) ? '尚無報名' : `餘 ${remaining} 位`;
+    return `<div class="spots-num full-text" style="font-size:0.85rem">待開班</div><div class="spots-label">${label}</div>`;
+  }
   return `<div class="spots-num">${remaining}</div><div class="spots-label">剩餘名額</div>`;
 }
 
@@ -648,8 +654,8 @@ function renderList() {
           <button class="edit-toggle-btn" id="cdelete_${c.id}">🗑️ 刪除</button>
           ${c.cancelled
             ? `<button class="edit-toggle-btn course-reopen-btn" id="creopen_${c.id}">🔄 恢復</button>`
-            : `<button class="edit-toggle-btn course-cancel-btn" id="ccancel_${c.id}">⛔ 停課</button>`}
-          <button class="edit-toggle-btn course-remind-btn" id="cremind_${c.id}">📣 提醒</button>
+            : `<button class="edit-toggle-btn course-cancel-btn" id="ccancel_${c.id}">⏸️ 停課</button>`}
+          <button class="edit-toggle-btn course-remind-btn" id="cremind_${c.id}">📣 開課通知</button>
         </div>` : ''}
       </div>
       <div class="card-spots">
@@ -916,7 +922,7 @@ function renderList() {
         } catch (err) {
           showToast('發送失敗，請再試一次');
         }
-        btn.disabled = false; btn.textContent = '📣 提醒';
+        btn.disabled = false; btn.textContent = '📣 開課通知';
       });
 
 
@@ -1111,7 +1117,7 @@ function renderDayDetail(dateStr, dayCourses) {
     const { state, remaining } = courseStatus(c);
     const isFull = state === 'closed' || state === 'full' || state === 'cancelled';
     const dotColor = state === 'open' ? 'var(--rose)' : state === 'pending' ? 'var(--gold)' : '#ccc';
-    const spotsText = state === 'cancelled' ? `已停課・${courseCancelReasonLabel(c)}` : state === 'closed' ? '已關閉' : state === 'full' ? '已滿班' : state === 'pending' ? `待開班・餘 ${remaining} 位` : `餘 ${remaining} 位`;
+    const spotsText = state === 'cancelled' ? `已停課・${courseCancelReasonLabel(c)}` : state === 'closed' ? '已關閉' : state === 'full' ? '已滿班' : state === 'pending' ? `待開班・${(isAdmin() && (c.maxSpots - remaining) === 0) ? '尚無報名' : `餘 ${remaining} 位`}` : `餘 ${remaining} 位`;
     const dciTag = (!isAdmin() && hasPendingLeave(c.id)) ? '<span class="tag-leave">🙋 請假申請中</span>'
                  : (!isAdmin() && hasApprovedDeductLeave(c.id)) ? '<span class="tag-leave-done">🙋 已請假</span>'
                  : (!isAdmin() && isEnrolled(c.id)) ? '<span class="tag-enrolled">✓ 已報名</span>'
@@ -1534,7 +1540,7 @@ ${isAdmin() ? renderModalRoster(course) : (hasPendingLeave(course.id) ? `
         : '<button class="btn-cart" id="addToCartBtn">🛒 加入購物車</button>'
       }
     </div>` : `
-    <div class="full-notice">${state === 'cancelled' ? `本堂已停課（${courseCancelReasonLabel(course)}），已報名學生的堂數已全額退回` : '本班已額滿，如有需要請向老師詢問候補 🙏'}</div>
+    <div class="full-notice">${state === 'cancelled' ? '本堂已停課，如有任何問題請向老師詢問 🙏' : '本班已額滿，如有需要請向老師詢問候補 🙏'}</div>
     `)}
     <button class="btn-close" id="closeModalBtn">關閉</button>
   `;
