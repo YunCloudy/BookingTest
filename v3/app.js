@@ -555,7 +555,7 @@ async function cancelCourseWithRefund(c, reasonCode, reasonText, reasonLabel) {
     try {
       await pushNotification('users', b.studentId, {
         type: 'course_cancelled',
-        message: `「${c.title}」（${c.date} ${c.time}）因${reasonLabel}停課，堂數已退回`,
+        message: `因${reasonLabel}停課，堂數已退回`,
         detail: `${c.title} ${c.date}${c.time}`
       });
     } catch (e) { /* 通知失敗不要卡住整批 */ }
@@ -711,7 +711,7 @@ function renderList() {
             reasonText = prompt('請輸入停課原因：') || '';
             if (!reasonText.trim()) return; // 沒填就不繼續，維持面板開著讓老師重選
           }
-          const label = code === 'understaffed' ? '人數不足未開班' : code === 'weather' ? '颱風停課' : reasonText;
+          const label = code === 'understaffed' ? '人數不足' : code === 'weather' ? '颱風' : reasonText;
           const bookedCount = (bookings[c.id] || []).length;
           const confirmMsg = bookedCount > 0
             ? `確定要停課「${c.title}」（${c.date} ${c.time}）嗎？\n將會退回 ${bookedCount} 位已報名學生的堂數、清空名額，並發送通知。此操作無法自動復原。`
@@ -914,7 +914,7 @@ function renderList() {
             const statusText = b.onLeave ? '已請假' : '已報名';
             await pushNotification('users', b.studentId, {
               type: 'course_reminder',
-              message: `開課提醒：「${c.title}」（${c.date} ${c.time}）你目前的狀態是「${statusText}」`,
+              message: `開課提醒：你目前的報名狀態是「${statusText}」`,
               detail: `${c.title} ${c.date}${c.time}`
             });
           }
@@ -2173,6 +2173,9 @@ document.getElementById('googleLoginBtn').addEventListener('click', () => {
     }
     // 撈學生訂單，才能顯示「已報名」標籤和擋重複報名
     await loadStudentOrders(user.uid);
+    // 課程/名額資料也重撈一次，避免換帳號時畫面還停在切換前那個帳號載入當下的舊快照
+    // （例如老師剛在別的分頁把某堂課停課，這裡切帳號如果不重撈，畫面會先短暫顯示舊狀態，要手動重整才會更新）
+    await loadFromStorage();
     if (currentView === 'calendar') renderCalendar(); else renderList();
     btn.innerHTML = GOOGLE_BTN_INNER;
     btn.disabled = false;
