@@ -513,7 +513,7 @@ function isAdmin() {
 // 停課原因代碼轉成顯示文字（v3.4）
 function courseCancelReasonLabel(c) {
   if (c.cancelReason === 'understaffed') return '人數不足';
-  if (c.cancelReason === 'weather') return '颱風停課';
+  if (c.cancelReason === 'weather') return '颱風/天候不佳';
   if (c.cancelReason === 'other') return c.cancelReasonText || '其他原因';
   return '已停課';
 }
@@ -540,7 +540,7 @@ async function cancelCourseWithRefund(c, reasonCode, reasonText, reasonLabel) {
         if (orderSnap.exists()) {
           const orderData = orderSnap.data();
           const updatedCourses = (orderData.courses || []).map(x =>
-            x.courseId === c.id ? { ...x, result: 'cancelled' } : x
+            x.courseId === c.id ? { ...x, result: 'cancelled', leaveStatus: 'none' } : x
           );
           const allCancelled = updatedCourses.every(x => x.result === 'cancelled');
           const newStatus = allCancelled ? 'cancelled' : 'confirmed';
@@ -673,7 +673,7 @@ function renderList() {
       const bookedList = bookings[c.id];
       const COURSE_CANCEL_REASONS = [
         { code: 'understaffed', label: '人數不足' },
-        { code: 'weather', label: '颱風停課' },
+        { code: 'weather', label: '颱風/天候不佳' },
         { code: 'other', label: '其他' }
       ];
       const cancelPanel = document.createElement('div');
@@ -711,7 +711,7 @@ function renderList() {
             reasonText = prompt('請輸入停課原因：') || '';
             if (!reasonText.trim()) return; // 沒填就不繼續，維持面板開著讓老師重選
           }
-          const label = code === 'understaffed' ? '人數不足' : code === 'weather' ? '颱風' : reasonText;
+          const label = code === 'understaffed' ? '人數不足' : code === 'weather' ? '颱風/天候不佳' : reasonText;
           const bookedCount = (bookings[c.id] || []).length;
           const confirmMsg = bookedCount > 0
             ? `確定要停課「${c.title}」（${c.date} ${c.time}）嗎？\n將會退回 ${bookedCount} 位已報名學生的堂數、清空名額，並發送通知。此操作無法自動復原。`
