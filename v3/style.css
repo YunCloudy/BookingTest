@@ -1842,20 +1842,23 @@ main { padding: 20px 16px 40px; max-width: 680px; margin: 0 auto; }
   color: var(--mocha-light);
   font-style: italic;
 }
-/* v3.4 堂數池到期日 */
-.credit-tag-expiry {
-  opacity: 0.6;
-  font-size: 0.68rem;
+/* v3.4 堂數池共用使用期限（獨立一行，不黏在標籤上，過期就不顯示這行也不顯示標籤過期字樣） */
+.credit-expiry-note {
+  font-size: 0.7rem;
+  color: var(--mocha-light);
+  opacity: 0.7;
+  margin-top: 2px;
 }
-.credit-tag.credit-tag-expired {
-  color: #c97b6d;
-  border-color: #c97b6d;
-  opacity: 0.85;
+.credit-extend-btn {
+  font-size: 0.78rem;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px dashed var(--mocha-light);
+  background: none;
+  color: var(--oat);
+  cursor: pointer;
 }
-.student-credit-tag.credit-tag-expired {
-  color: #b5695c;
-  background: #f5e6e2;
-}
+.credit-extend-btn:hover { opacity: 0.75; }
 .credit-add-wrap {
   margin: 10px 0 4px;
   padding: 8px 10px;

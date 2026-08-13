@@ -55,7 +55,7 @@ let currentTeacher = null;  // Google 登入的老師（Firebase User）
 let currentStudent = null;  // Google 登入的學生
 let studentOrders = [];     // 學生登入後從 users/{uid}/orders/ 撈回來的訂單
 let currentStudentCredits = {}; // 學生登入後自己的未用堂數（從 users/{uid}.remainingCredits 讀，v3.3 第二階段）
-let currentStudentCreditExpiry = {}; // 對應堂數池的到期日（從 users/{uid}.creditExpiry 讀，v3.4）
+let currentStudentCreditExpiry = null; // 共用堂數到期日（從 users/{uid}.creditExpiry 讀，單一日期字串，v3.4）
 
 // ── CART ──
 const TEACHER_ID_STATIC = 'test_aerial';
@@ -408,14 +408,16 @@ function studentDocRef(tid, studentId) {
 
 // ══════════════════════════════════════════
 // ── 堂數池使用期限 (v3.4 Step 2) ──
-// 資料存放位置：跟 remainingCredits 平行的欄位 creditExpiry，同樣是 { [poolKey]: 'YYYY-MM-DD' }
-// 沒有跟堂數合併成 { count, expireAt } 是刻意的：這樣舊資料（只有 remainingCredits 數字）
-// 完全不用搬遷，現有讀取「剩餘幾堂」的地方全部不用改，只有新增「要不要顯示/擋到期」的地方才去讀這個新欄位
+// 資料存放位置：跟 remainingCredits 平行的欄位 creditExpiry，是單一日期字串 'YYYY-MM-DD'
+//（不是 { [poolKey]: 日期 }）—— 因為目前規則是「全部堂數池一起延展，不分課程類別」（筆記第5點），
+// 一個學生只有一個共用到期日。日期計算/判斷寫成通用函式，之後如果真的要做「各類別各自獨立到期」，
+// 只要把 creditExpiry 換成物件、呼叫端各自傳日期進去就好，下面這幾個函式本身不用改
 //
-// 到期規則（筆記第5點）：有「購買行為」→ 該堂數池到期日更新為「當月＋2個月的月底」
+// 到期規則：有「購買行為」（不分是否為package式優惠、單堂購買也算）→ 到期日更新為「當月＋2個月的月底」
 //   例：3月有購買 → 5/31；4月有購買 → 6/30
-//   全部堂數池目前一起延展（不分課程類別），底層先留獨立算的路徑（見下方函式參數），
-//   之後要做「各類別各自獨立到期」時，呼叫端只要不要一次把所有 poolKey 都傳同一個到期日就好
+//
+// UI 原則：過期後不顯示任何「已過期」提示或標記，畫面上就是可用堂數變 0（自然消失），
+// 只在程式碼裡擋「扣抵已過期堂數」這個動作，不在畫面上額外強調過期這件事
 // ══════════════════════════════════════════
 
 // 算「當月＋2個月的月底」，fromDate 預設為現在（購買發生當下）
@@ -424,32 +426,38 @@ function computeCreditExpiry(fromDate = new Date()) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-// 這個堂數池是否已過期。沒有到期日資料（例如舊資料、或還沒有任何購買紀錄）一律視為「未過期」，
+// 到期日是否已過期。沒有到期日資料（例如舊資料、或還沒有任何購買紀錄）一律視為「未過期」，
 // 避免功能剛上線時舊資料被誤擋
-function isPoolCreditExpired(expireAt, asOf = new Date()) {
+function isCreditExpired(expireAt, asOf = new Date()) {
   if (!expireAt) return false;
   return asOf > new Date(`${expireAt}T23:59:59`);
 }
 
 // ⚠️ V3.4 到期擋用開關：預設「已過期就不能扣抵使用」。
-// 未來如果要開放老師覆蓋（例如通融學生延後用），只要在呼叫這個函式的地方改邏輯即可，
-// 不用動這個函式本身 —— 這個函式只負責回答「這個池子現在算不算過期」，不負責要不要擋
+// 未來如果要開放老師覆蓋，只要在呼叫這個函式的地方改邏輯即可，不用動這個函式本身
 function canUseCredit(expireAt, asOf = new Date()) {
-  return !isPoolCreditExpired(expireAt, asOf);
+  return !isCreditExpired(expireAt, asOf);
+}
+
+// 過期後畫面上顯示的「有效堂數」：過期就是 0，不論資料庫裡實際存的數字是多少
+// （資料庫的原始數字不動，只有顯示/可用性上視為 0，這樣之後萬一到期規則調整，歷史數字還在，不會遺失）
+function effectiveCredit(rawCount, expireAt, asOf = new Date()) {
+  if (isCreditExpired(expireAt, asOf)) return 0;
+  return rawCount || 0;
 }
 
 // ══════════════════════════════════════════
 
-// 讀取單一學生目前的堂數池＋到期日（不存在則回傳空物件）
+// 讀取單一學生目前的堂數池＋到期日（不存在則回傳空物件／null）
 async function getStudentCreditData(tid, studentId) {
-  if (!tid || !studentId) return { credits: {}, expiry: {} };
+  if (!tid || !studentId) return { credits: {}, expireAt: null };
   try {
     const snap = await getDoc(studentDocRef(tid, studentId));
     const data = snap.exists() ? snap.data() : {};
-    return { credits: data.remainingCredits || {}, expiry: data.creditExpiry || {} };
+    return { credits: data.remainingCredits || {}, expireAt: data.creditExpiry || null };
   } catch (e) {
     console.warn('讀取學生堂數失敗', e);
-    return { credits: {}, expiry: {} };
+    return { credits: {}, expireAt: null };
   }
 }
 
@@ -461,22 +469,20 @@ async function getStudentCredits(tid, studentId) {
 }
 
 // 學生端：把未用堂數畫進「🎫 未用堂數」卡片（v3.3 第二階段，改成獨立卡片，方便未來多老師擴充）
-// v3.4：多帶一個 expiry 參數，過期的池子顯示「已於 X/X 到期」，不再算進可用堂數
-function renderStudentCreditList(credits, expiry = {}) {
+// v3.4：多帶一個 expireAt（單一共用日期）—— 過期的池子直接不算進可用堂數（畫面上就是消失/變0，不特別標記過期）；
+// 「使用期限」只顯示一次，跟堂數標籤分開放，不重複黏在每個標籤後面
+function renderStudentCreditList(credits, expireAt = null) {
   const wrap = document.getElementById('studentCreditList');
   if (!wrap) return;
-  const entries = Object.entries(credits || {}).filter(([, v]) => v);
-  wrap.innerHTML = entries.length
-    ? `<div class="credit-tags" style="justify-content:center">${entries.map(([pk, v]) => {
-        const expireAt = expiry[pk];
-        const expired = isPoolCreditExpired(expireAt);
-        if (expired) {
-          return `<span class="student-credit-tag credit-tag-expired">${poolLabel(pk)}　已於 ${expireAt} 到期</span>`;
-        }
-        const expiryHint = expireAt ? `　（使用期限 ${expireAt}）` : '';
-        return `<span class="student-credit-tag">${poolLabel(pk)}　剩餘 <b>${v}</b> 堂${expiryHint}</span>`;
-      }).join('')}</div>`
+  const expired = isCreditExpired(expireAt);
+  const entries = Object.entries(credits || {})
+    .map(([pk, v]) => [pk, effectiveCredit(v, expireAt)])
+    .filter(([, v]) => v);
+  const tagsHtml = entries.length
+    ? `<div class="credit-tags" style="justify-content:center">${entries.map(([pk, v]) => `<span class="student-credit-tag">${poolLabel(pk)}　剩餘 <b>${v}</b> 堂</span>`).join('')}</div>`
     : `<div class="student-credit-empty">目前沒有未用堂數</div>`;
+  const expiryLine = (entries.length && expireAt && !expired) ? `<div class="credit-expiry-note">使用期限：${expireAt}</div>` : '';
+  wrap.innerHTML = tagsHtml + expiryLine;
 }
 
 // 從課程時間欄位（例如 "19:20-20:20"、"18:10~19:10"）解析出開始時間 "HH:MM"
@@ -488,7 +494,7 @@ function parseCourseStartTime(timeStr) {
 
 // ── 共用堂數調整函式 ──
 // 訂單審核完成時「未使用堂數異動」用這個：在原本堂數上累加 delta（可正可負，未來請假退堂也會用）
-// v3.4：多一個 opts.isPurchase，true 的時候才會順便延展這個 poolKey 的到期日（筆記第5點）
+// v3.4：多一個 opts.isPurchase，true 的時候會順便把共用到期日延展（筆記第5點）
 //   → 只有「訂單審核完成、新增堂數」代表真正的購買行為才傳 true；
 //     停課退回堂數、請假退回堂數、老師手動修正，都不算購買，不動到期日
 async function adjustCredits(tid, studentId, studentName, poolKey, delta, opts = {}) {
@@ -499,19 +505,13 @@ async function adjustCredits(tid, studentId, studentName, poolKey, delta, opts =
     const existing = snap.exists() ? snap.data() : {};
     const credits = { ...(existing.remainingCredits || {}) };
     credits[poolKey] = (credits[poolKey] || 0) + delta;
-    const expiry = { ...(existing.creditExpiry || {}) };
-    if (opts.isPurchase) {
-      expiry[poolKey] = computeCreditExpiry();
-    }
-    await setDoc(ref, {
-      name: studentName || existing.name || '',
-      remainingCredits: credits,
-      creditExpiry: expiry,
-      updatedAt: new Date().toISOString()
-    }, { merge: true });
+    const expireAt = opts.isPurchase ? computeCreditExpiry() : (existing.creditExpiry || null);
+    const payload = { name: studentName || existing.name || '', remainingCredits: credits, updatedAt: new Date().toISOString() };
+    if (expireAt) payload.creditExpiry = expireAt;
+    await setDoc(ref, payload, { merge: true });
     // 鏡射一份到 users/{uid}，供學生端讀取
     try {
-      await setDoc(doc(db, 'users', studentId), { remainingCredits: credits, creditExpiry: expiry }, { merge: true });
+      await setDoc(doc(db, 'users', studentId), { remainingCredits: credits, ...(expireAt ? { creditExpiry: expireAt } : {}) }, { merge: true });
     } catch (mirrorErr) {
       console.warn('學生端堂數鏡射失敗（不影響老師端）', mirrorErr);
     }
@@ -522,10 +522,36 @@ async function adjustCredits(tid, studentId, studentName, poolKey, delta, opts =
   }
 }
 
+// v3.4：單純延展共用到期日，不動堂數本身。
+// 用在「訂單審核完成、這筆訂單裡有課程被 confirm」的時候 —— 不管這筆訂單有沒有另外調整堂數異動欄位，
+// 只要學生買了課（哪怕沒有堂數異動、單堂購買也算，筆記第5點），就要延展期限。
+// 也給「✍️手動延展到期日」按鈕共用（老師覺得系統邏輯還沒兜起來、或例外狀況要手動修正時用）
+async function extendCreditExpiry(tid, studentId, studentName) {
+  if (!tid || !studentId) return null;
+  const ref = studentDocRef(tid, studentId);
+  const expireAt = computeCreditExpiry();
+  try {
+    await setDoc(ref, {
+      name: studentName || '',
+      creditExpiry: expireAt,
+      updatedAt: new Date().toISOString()
+    }, { merge: true });
+    try {
+      await setDoc(doc(db, 'users', studentId), { creditExpiry: expireAt }, { merge: true });
+    } catch (mirrorErr) {
+      console.warn('學生端堂數鏡射失敗（不影響老師端）', mirrorErr);
+    }
+    return expireAt;
+  } catch (e) {
+    console.warn('延展堂數到期日失敗', e);
+    return null;
+  }
+}
+
 // ✍️手動調整未用堂數（學生管理頁用）：直接把某個 poolKey 設成「總堂數」，不是累加
 // 跟 adjustCredits 分開是因為這裡老師想看到、改到的是最終總數，不是要加減幾堂
-// v3.4：手動修正預設不動到期日（老師是在校正數字，不是在幫學生購買），opts.isPurchase 保留給未來萬一要用
-async function setCredits(tid, studentId, studentName, poolKey, total, opts = {}) {
+// v3.4：手動修正預設不動到期日（老師是在校正數字，不是在幫學生購買）
+async function setCredits(tid, studentId, studentName, poolKey, total) {
   if (!tid || !studentId || !poolKey || total == null || isNaN(total)) return null;
   const ref = studentDocRef(tid, studentId);
   try {
@@ -533,18 +559,13 @@ async function setCredits(tid, studentId, studentName, poolKey, total, opts = {}
     const existing = snap.exists() ? snap.data() : {};
     const credits = { ...(existing.remainingCredits || {}) };
     credits[poolKey] = total;
-    const expiry = { ...(existing.creditExpiry || {}) };
-    if (opts.isPurchase) {
-      expiry[poolKey] = computeCreditExpiry();
-    }
     await setDoc(ref, {
       name: studentName || existing.name || '',
       remainingCredits: credits,
-      creditExpiry: expiry,
       updatedAt: new Date().toISOString()
     }, { merge: true });
     try {
-      await setDoc(doc(db, 'users', studentId), { remainingCredits: credits, creditExpiry: expiry }, { merge: true });
+      await setDoc(doc(db, 'users', studentId), { remainingCredits: credits }, { merge: true });
     } catch (mirrorErr) {
       console.warn('學生端堂數鏡射失敗（不影響老師端）', mirrorErr);
     }
@@ -2341,7 +2362,7 @@ document.getElementById('googleLoginBtn').addEventListener('click', () => {
       const snap = await getDoc(doc(db, 'users', user.uid));
       const nickname = snap.exists() ? snap.data().nickname : null;
       currentStudentCredits = snap.exists() ? (snap.data().remainingCredits || {}) : {};
-      currentStudentCreditExpiry = snap.exists() ? (snap.data().creditExpiry || {}) : {};
+      currentStudentCreditExpiry = snap.exists() ? (snap.data().creditExpiry || null) : null;
       updateStudentBtn(nickname);
     } catch(e) {
       updateStudentBtn();
@@ -2374,7 +2395,7 @@ document.getElementById('studentCreditBtn').addEventListener('click', async () =
   try {
     const snap = await getDoc(doc(db, 'users', currentStudent.uid));
     currentStudentCredits = snap.exists() ? (snap.data().remainingCredits || {}) : {};
-    currentStudentCreditExpiry = snap.exists() ? (snap.data().creditExpiry || {}) : {};
+    currentStudentCreditExpiry = snap.exists() ? (snap.data().creditExpiry || null) : null;
   } catch(e) {}
   renderStudentCreditList(currentStudentCredits, currentStudentCreditExpiry);
 });
@@ -2425,7 +2446,7 @@ document.getElementById('studentLogoutConfirm').addEventListener('click', async 
   currentStudent = null;
   studentOrders = [];
   currentStudentCredits = {};
-  currentStudentCreditExpiry = {};
+  currentStudentCreditExpiry = null;
   sessionStorage.removeItem('loginRole');
   clearNotifications();
   updateStudentBtn();
@@ -2854,12 +2875,12 @@ function renderAdmin() {
 
     // 撈這批訂單涉及到的所有學生目前未用堂數（資料已在記憶體，審核時不用多查一次）
     const creditsMap = new Map(); // studentId → { [poolKey]: 數量 }
-    const creditExpiryMap = new Map(); // studentId → { [poolKey]: 'YYYY-MM-DD' }（v3.4）
+    const creditExpiryMap = new Map(); // studentId → 'YYYY-MM-DD'｜null（共用到期日，v3.4）
     const uniqueStudentIds = [...new Set(orders.map(o => o.studentId).filter(Boolean))];
     await Promise.all(uniqueStudentIds.map(async sid => {
-      const { credits, expiry } = await getStudentCreditData(tid, sid);
+      const { credits, expireAt } = await getStudentCreditData(tid, sid);
       creditsMap.set(sid, credits);
-      creditExpiryMap.set(sid, expiry);
+      creditExpiryMap.set(sid, expireAt);
     }));
 
     orderSection.innerHTML = '';
@@ -2924,9 +2945,9 @@ function renderAdmin() {
 
         const isPending = order.status === 'pending';
 
-        // ── 堂數池：這筆訂單涉及的 poolKey，以及該學生目前各池未用堂數／到期日 ──
+        // ── 堂數池：這筆訂單涉及的 poolKey、該學生目前各池未用堂數、共用到期日 ──
         const studentCredits = creditsMap.get(order.studentId) || {};
-        const studentCreditExpiry = creditExpiryMap.get(order.studentId) || {}; // v3.4
+        const studentCreditExpireAt = creditExpiryMap.get(order.studentId) || null; // v3.4：全部 poolKey 共用同一個日期
         const orderPoolKeys = [...new Set(
           (order.courses || []).map(c => getPoolKey(courses.find(cs => cs.id === c.courseId) || { title: c.title }))
         )].filter(Boolean);
@@ -2939,11 +2960,10 @@ function renderAdmin() {
             ${orderPoolKeys.map(pk => {
               const draft = localStorage.getItem(`credit_draft_${order.id}_${pk}`);
               const val = draft != null ? draft : '';
-              const expireAt = studentCreditExpiry[pk] || '';
               return `
               <div class="credit-add-row">
                 <span class="credit-add-label">${poolLabel(pk)}</span>
-                <input class="credit-add-input" type="number" placeholder="0" value="${val}" data-pool="${pk}" data-order-id="${order.id}" data-expire-at="${expireAt}">
+                <input class="credit-add-input" type="number" placeholder="0" value="${val}" data-pool="${pk}" data-order-id="${order.id}" data-expire-at="${studentCreditExpireAt || ''}">
                 <span class="credit-add-unit">堂</span>
               </div>
             `;
@@ -2953,18 +2973,20 @@ function renderAdmin() {
 
         // ── 目前未用堂數：只有待審核訂單顯示，放在最上面「聯絡資訊」的位置（展開才看得到）──
         // 標題沿用 order-contact 那個灰色（跟日期同一種灰），標籤不額外包深色底，跟學生管理頁視覺一致
-        const contactHtml = isPending && order.studentId && orderPoolKeys.length ? `
+        // v3.4：過期就直接不算進顯示堂數（effectiveCredit），不額外標記「已過期」；使用期限只在有效堂數存在時顯示一次
+        const contactHtml = isPending && order.studentId && orderPoolKeys.length ? (() => {
+          const tagsHtml = orderPoolKeys.map(pk => {
+            const v = effectiveCredit(studentCredits[pk], studentCreditExpireAt);
+            return `<span class="credit-tag">${poolLabel(pk)} <b>${v}</b>堂</span>`;
+          }).join('');
+          const anyActive = orderPoolKeys.some(pk => effectiveCredit(studentCredits[pk], studentCreditExpireAt) > 0);
+          const expiryLine = (anyActive && studentCreditExpireAt) ? `<div class="credit-expiry-note">使用期限：${studentCreditExpireAt}</div>` : '';
+          return `
           <div class="order-contact">未用堂數</div>
-          <div class="credit-tags" style="margin-bottom:8px">
-            ${orderPoolKeys.map(pk => {
-              const expireAt = studentCreditExpiry[pk];
-              const expired = isPoolCreditExpired(expireAt);
-              return expired
-                ? `<span class="credit-tag credit-tag-expired">${poolLabel(pk)} <b>${studentCredits[pk] || 0}</b>堂（已於 ${expireAt} 到期）</span>`
-                : `<span class="credit-tag">${poolLabel(pk)} <b>${studentCredits[pk] || 0}</b>堂${expireAt ? `<span class="credit-tag-expiry"> ・ 期限 ${expireAt}</span>` : ''}</span>`;
-            }).join('')}
-          </div>
-        ` : `<div class="order-contact">本行文字待定，預計填寫email/手機/line名稱</div>`;
+          <div class="credit-tags" style="margin-bottom:4px">${tagsHtml}</div>
+          ${expiryLine}
+        `;
+        })() : `<div class="order-contact">本行文字待定，預計填寫email/手機/line名稱</div>`;
 
         // ── ✍️手動調整未用堂數（已審核訂單才顯示，補堂／修正用，跟學生管理頁共用同一顆 setCredits）──
         const manualAdjustHtml = !isPending && order.studentId ? (() => {
@@ -3323,35 +3345,34 @@ function renderAdmin() {
             }
             await saveToStorage();
             order.status = newStatus;
+            // v3.4：只要這筆訂單有課程被 confirm，就代表發生了一次購買行為，不管有沒有另外填「未使用堂數異動」，
+            // 都要延展共用到期日（筆記第5點：不分是否為package式優惠、單堂購買也算）
+            const hasConfirmedCourse = order.courses.some(c => c.result === 'confirmed');
+            if (order.studentId && hasConfirmedCourse) {
+              await extendCreditExpiry(tid, order.studentId, order.studentName);
+            }
             // 未使用堂數異動：讀取「本次新增幾堂」輸入框，自動加總到對應堂數池
-            // v3.4：
-            //   delta > 0（本次新增，代表這筆訂單是一次購買行為）→ 順便延展到期日（isPurchase: true）
-            //   delta < 0（扣抵/使用既有堂數）→ 先擋「已過期的池子不能扣抵」（預設擋，未來要開放覆蓋的話改這裡的 if 就好）
+            // delta < 0（扣抵/使用既有堂數）→ 先擋「已過期就不能扣抵」（預設擋，未來要開放覆蓋的話改這裡的 if 就好）
             if (order.studentId) {
               const addWrap = listWrap.querySelector(`.credit-add-wrap[data-order-id="${orderId}"]`);
               if (addWrap) {
                 const addInputs = addWrap.querySelectorAll('.credit-add-input');
-                let blockedByExpiry = false;
                 for (const input of addInputs) {
                   const raw = input.value.trim();
                   const delta = raw === '' ? 0 : Number(raw);
                   const poolKey = input.dataset.pool;
                   const expireAt = input.dataset.expireAt || '';
                   if (delta < 0 && !canUseCredit(expireAt)) {
-                    // ⚠️ V3.4 到期擋用：預設不能扣抵已過期的堂數池
-                    blockedByExpiry = true;
-                    showToast(`${poolLabel(poolKey)} 已於 ${expireAt} 到期，無法扣抵，請改用手動調整堂數`);
+                    // ⚠️ V3.4 到期擋用：預設不能扣抵已過期的堂數
+                    showToast(`堂數已過期，無法扣抵，請改用手動調整堂數`);
+                    localStorage.removeItem(`credit_draft_${orderId}_${poolKey}`);
                     continue;
                   }
                   if (delta) {
-                    await adjustCredits(tid, order.studentId, order.studentName, poolKey, delta, { isPurchase: delta > 0 });
+                    await adjustCredits(tid, order.studentId, order.studentName, poolKey, delta);
                   }
                   // 審核完成了，清掉這筆訂單這個 pool 的本地暫存
                   localStorage.removeItem(`credit_draft_${orderId}_${poolKey}`);
-                }
-                if (blockedByExpiry) {
-                  // 這筆訂單審核狀態仍然照常送出（不卡整筆流程），只有過期的那個 poolKey 沒有被扣抵，
-                  // 老師需要另外用✍️手動調整處理
                 }
               }
             }
@@ -3836,9 +3857,9 @@ function renderAdmin() {
 
     // 撈每人目前堂數池（資料量不大，直接一次撈完）
     await Promise.all(studentList.map(async s => {
-      const { credits, expiry } = await getStudentCreditData(tid, s.studentId);
+      const { credits, expireAt } = await getStudentCreditData(tid, s.studentId);
       s.remainingCredits = credits;
-      s.creditExpiry = expiry; // v3.4
+      s.creditExpireAt = expireAt; // v3.4：共用到期日
     }));
 
     studentSection.innerHTML = '';
@@ -3877,9 +3898,13 @@ function renderAdmin() {
 
       filtered.forEach(s => {
         const credits = s.remainingCredits || {};
-        const expiry = s.creditExpiry || {}; // v3.4
-        const poolEntries = Object.entries(credits).filter(([, v]) => v);
+        const expireAt = s.creditExpireAt || null; // v3.4：共用到期日
+        // v3.4：過期就直接不算進顯示堂數，不額外標記「已過期」
+        const poolEntries = Object.entries(credits)
+          .map(([pk, v]) => [pk, effectiveCredit(v, expireAt)])
+          .filter(([, v]) => v);
         const firstPool = allPoolKeys()[0] || '';
+        const expiryLine = (poolEntries.length && expireAt) ? `<div class="credit-expiry-note">使用期限：${expireAt}</div>` : '';
         const card = document.createElement('div');
         card.className = 'admin-card';
         card.style.marginBottom = '10px';
@@ -3888,20 +3913,16 @@ function renderAdmin() {
             <div class="order-student-name">${s.studentName}</div>
             ${s.studentEmail ? `<div class="order-date">${s.studentEmail}</div>` : ''}
           </div>
-          <div class="credit-tags" style="margin:6px 0">
+          <div class="credit-tags" style="margin:6px 0 0">
             ${poolEntries.length
-              ? poolEntries.map(([pk, v]) => {
-                  const expireAt = expiry[pk];
-                  const expired = isPoolCreditExpired(expireAt);
-                  return expired
-                    ? `<span class="credit-tag credit-tag-expired">${poolLabel(pk)}　${v}堂（已於 ${expireAt} 到期）</span>`
-                    : `<span class="credit-tag">${poolLabel(pk)}　剩餘 <b>${v}</b> 堂${expireAt ? `<span class="credit-tag-expiry"> ・ 期限 ${expireAt}</span>` : ''}</span>`;
-                }).join('')
+              ? poolEntries.map(([pk, v]) => `<span class="credit-tag">${poolLabel(pk)}　剩餘 <b>${v}</b> 堂</span>`).join('')
               : `<span class="credit-tag credit-tag-empty">尚無未用堂數</span>`}
           </div>
+          ${expiryLine}
           <div class="credit-manual-wrap" data-student-id="${s.studentId}" data-student-name="${s.studentName}">
-            <div style="display:flex; gap:8px;">
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
               <button class="credit-manual-toggle" type="button">✍️手動調整堂數</button>
+              <button class="credit-extend-btn" type="button" data-student-id="${s.studentId}" data-student-name="${s.studentName}">📅延展到期日</button>
               <button class="credit-zero-btn" type="button" data-student-id="${s.studentId}" data-student-name="${s.studentName}">歸零</button>
             </div>
             <div class="credit-manual-form" style="display:none">
@@ -3912,9 +3933,31 @@ function renderAdmin() {
               <span class="credit-add-unit">堂</span>
               <button class="credit-manual-apply" type="button">套用</button>
             </div>
+
           </div>
         `;
         listWrap.appendChild(card);
+      });
+
+      // v3.4：手動延展到期日 —— 系統邏輯還沒完全兜起來，或例外狀況要手動修正時用，
+      // 直接把共用到期日設成「現在起算的當月+2個月月底」，不動堂數本身
+      listWrap.querySelectorAll('.credit-extend-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const studentId = btn.dataset.studentId;
+          const studentName = btn.dataset.studentName;
+          const newExpireAt = computeCreditExpiry();
+          if (!confirm(`確定要把「${studentName}」的堂數池到期日延展到 ${newExpireAt} 嗎？`)) return;
+          btn.textContent = '處理中…'; btn.disabled = true;
+          try {
+            const tid2 = teacherId || TEACHER_ID_STATIC;
+            await extendCreditExpiry(tid2, studentId, studentName);
+            showToast(`已將「${studentName}」的堂數池到期日延展到 ${newExpireAt}`);
+            renderStudentSection();
+          } catch (e) {
+            showToast('操作失敗，請再試一次');
+            btn.textContent = '📅延展到期日'; btn.disabled = false;
+          }
+        });
       });
 
       // 堂數歸零（測試用）：把該學生「所有」有紀錄的堂數池一次設為 0
@@ -4021,7 +4064,7 @@ function renderHomeSections() {
       teacherName = null;
       studentOrders = [];
       currentStudentCredits = {};
-      currentStudentCreditExpiry = {};
+      currentStudentCreditExpiry = null;
       clearNotifications();
       updateStudentBtn();
       updateTeacherBtn();
@@ -4057,7 +4100,7 @@ function renderHomeSections() {
         const snap = await getDoc(doc(db, 'users', user.uid));
         const nickname = snap.exists() ? snap.data().nickname : null;
         currentStudentCredits = snap.exists() ? (snap.data().remainingCredits || {}) : {};
-        currentStudentCreditExpiry = snap.exists() ? (snap.data().creditExpiry || {}) : {};
+        currentStudentCreditExpiry = snap.exists() ? (snap.data().creditExpiry || null) : null;
         updateStudentBtn(nickname);
       } catch(e) {
         updateStudentBtn();
@@ -4074,7 +4117,7 @@ function renderHomeSections() {
       const snap = await getDoc(doc(db, 'users', user.uid));
       const nickname = snap.exists() ? snap.data().nickname : null;
       currentStudentCredits = snap.exists() ? (snap.data().remainingCredits || {}) : {};
-      currentStudentCreditExpiry = snap.exists() ? (snap.data().creditExpiry || {}) : {};
+      currentStudentCreditExpiry = snap.exists() ? (snap.data().creditExpiry || null) : null;
       updateStudentBtn(nickname);
     } catch(e) {
       updateStudentBtn();
