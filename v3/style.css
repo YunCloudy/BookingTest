@@ -1850,13 +1850,14 @@ main { padding: 20px 16px 40px; max-width: 680px; margin: 0 auto; }
   margin-top: 2px;
 }
 .credit-extend-btn {
-  font-size: 0.78rem;
-  padding: 6px 10px;
-  border-radius: 6px;
+  background: transparent;
   border: 1px dashed var(--mocha-light);
-  background: none;
-  color: var(--oat);
+  color: var(--latte-light);
+  border-radius: 20px;
+  padding: 5px 12px;
+  font-size: 0.76rem;
   cursor: pointer;
+  font-family: inherit;
 }
 .credit-extend-btn:hover { opacity: 0.75; }
 .credit-add-wrap {

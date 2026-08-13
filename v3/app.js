@@ -420,6 +420,13 @@ function studentDocRef(tid, studentId) {
 // 只在程式碼裡擋「扣抵已過期堂數」這個動作，不在畫面上額外強調過期這件事
 // ══════════════════════════════════════════
 
+// 防呆：creditExpiry 應該永遠是 'YYYY-MM-DD' 字串。如果 Firestore 裡被手動改成其他型別
+// （例如主控台誤選成 timestamp／map），這裡一律當作「沒有到期日」處理，
+// 避免畫面顯示成 [object Object]。所有讀取 creditExpiry 的地方都要經過這一層再往下傳。
+function normalizeExpireAt(raw) {
+  return (typeof raw === 'string' && raw) ? raw : null;
+}
+
 // 算「當月＋2個月的月底」，fromDate 預設為現在（購買發生當下）
 function computeCreditExpiry(fromDate = new Date()) {
   const d = new Date(fromDate.getFullYear(), fromDate.getMonth() + 3, 0); // 月份+3 的第0天＝月份+2 的月底
@@ -454,7 +461,7 @@ async function getStudentCreditData(tid, studentId) {
   try {
     const snap = await getDoc(studentDocRef(tid, studentId));
     const data = snap.exists() ? snap.data() : {};
-    return { credits: data.remainingCredits || {}, expireAt: data.creditExpiry || null };
+    return { credits: data.remainingCredits || {}, expireAt: normalizeExpireAt(data.creditExpiry) };
   } catch (e) {
     console.warn('讀取學生堂數失敗', e);
     return { credits: {}, expireAt: null };
@@ -505,7 +512,7 @@ async function adjustCredits(tid, studentId, studentName, poolKey, delta, opts =
     const existing = snap.exists() ? snap.data() : {};
     const credits = { ...(existing.remainingCredits || {}) };
     credits[poolKey] = (credits[poolKey] || 0) + delta;
-    const expireAt = opts.isPurchase ? computeCreditExpiry() : (existing.creditExpiry || null);
+    const expireAt = opts.isPurchase ? computeCreditExpiry() : normalizeExpireAt(existing.creditExpiry);
     const payload = { name: studentName || existing.name || '', remainingCredits: credits, updatedAt: new Date().toISOString() };
     if (expireAt) payload.creditExpiry = expireAt;
     await setDoc(ref, payload, { merge: true });
@@ -2362,7 +2369,7 @@ document.getElementById('googleLoginBtn').addEventListener('click', () => {
       const snap = await getDoc(doc(db, 'users', user.uid));
       const nickname = snap.exists() ? snap.data().nickname : null;
       currentStudentCredits = snap.exists() ? (snap.data().remainingCredits || {}) : {};
-      currentStudentCreditExpiry = snap.exists() ? (snap.data().creditExpiry || null) : null;
+      currentStudentCreditExpiry = snap.exists() ? normalizeExpireAt(snap.data().creditExpiry) : null;
       updateStudentBtn(nickname);
     } catch(e) {
       updateStudentBtn();
@@ -2395,7 +2402,7 @@ document.getElementById('studentCreditBtn').addEventListener('click', async () =
   try {
     const snap = await getDoc(doc(db, 'users', currentStudent.uid));
     currentStudentCredits = snap.exists() ? (snap.data().remainingCredits || {}) : {};
-    currentStudentCreditExpiry = snap.exists() ? (snap.data().creditExpiry || null) : null;
+    currentStudentCreditExpiry = snap.exists() ? normalizeExpireAt(snap.data().creditExpiry) : null;
   } catch(e) {}
   renderStudentCreditList(currentStudentCredits, currentStudentCreditExpiry);
 });
@@ -3904,21 +3911,21 @@ function renderAdmin() {
           .map(([pk, v]) => [pk, effectiveCredit(v, expireAt)])
           .filter(([, v]) => v);
         const firstPool = allPoolKeys()[0] || '';
-        const expiryLine = (poolEntries.length && expireAt) ? `<div class="credit-expiry-note">使用期限：${expireAt}</div>` : '';
+        const expiryLine = (poolEntries.length && expireAt) ? `<div class="order-date">使用期限：${expireAt}</div>` : '';
         const card = document.createElement('div');
         card.className = 'admin-card';
         card.style.marginBottom = '10px';
         card.innerHTML = `
           <div class="order-header">
             <div class="order-student-name">${s.studentName}</div>
-            ${s.studentEmail ? `<div class="order-date">${s.studentEmail}</div>` : ''}
+            ${expiryLine}
           </div>
+          ${s.studentEmail ? `<div class="credit-expiry-note">${s.studentEmail}</div>` : ''}
           <div class="credit-tags" style="margin:6px 0 0">
             ${poolEntries.length
               ? poolEntries.map(([pk, v]) => `<span class="credit-tag">${poolLabel(pk)}　剩餘 <b>${v}</b> 堂</span>`).join('')
               : `<span class="credit-tag credit-tag-empty">尚無未用堂數</span>`}
           </div>
-          ${expiryLine}
           <div class="credit-manual-wrap" data-student-id="${s.studentId}" data-student-name="${s.studentName}">
             <div style="display:flex; gap:8px; flex-wrap:wrap;">
               <button class="credit-manual-toggle" type="button">✍️手動調整堂數</button>
@@ -4100,7 +4107,7 @@ function renderHomeSections() {
         const snap = await getDoc(doc(db, 'users', user.uid));
         const nickname = snap.exists() ? snap.data().nickname : null;
         currentStudentCredits = snap.exists() ? (snap.data().remainingCredits || {}) : {};
-        currentStudentCreditExpiry = snap.exists() ? (snap.data().creditExpiry || null) : null;
+        currentStudentCreditExpiry = snap.exists() ? normalizeExpireAt(snap.data().creditExpiry) : null;
         updateStudentBtn(nickname);
       } catch(e) {
         updateStudentBtn();
@@ -4117,7 +4124,7 @@ function renderHomeSections() {
       const snap = await getDoc(doc(db, 'users', user.uid));
       const nickname = snap.exists() ? snap.data().nickname : null;
       currentStudentCredits = snap.exists() ? (snap.data().remainingCredits || {}) : {};
-      currentStudentCreditExpiry = snap.exists() ? (snap.data().creditExpiry || null) : null;
+      currentStudentCreditExpiry = snap.exists() ? normalizeExpireAt(snap.data().creditExpiry) : null;
       updateStudentBtn(nickname);
     } catch(e) {
       updateStudentBtn();
