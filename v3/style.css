@@ -1614,6 +1614,12 @@ main { padding: 20px 16px 40px; max-width: 680px; margin: 0 auto; }
   background: rgba(0,0,0,0.15);
   border-radius: 8px;
 }
+/* v3.4 已套用優惠提示（只是提示，不是可編輯欄位，金額本身還是靠上面的 input 覆蓋） */
+.order-discount-note {
+  font-size: 0.78rem;
+  color: var(--rose, #c97b6d);
+  margin: -2px 0 6px 2px;
+}
 .order-amount-label {
   font-size: 0.82rem;
   color: var(--latte-light);

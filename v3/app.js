@@ -402,6 +402,59 @@ function suggestRefundAmount({ poolKey, course, monthlyCountIncludingThisCourse 
   return { amount: met ? rule.unitPrice : course.price, discounted: met };
 }
 
+// ── Step 3：把上面的純函式接到真實訂單資料 ──
+
+// 算某學生在某 poolKey 下，「已審核完成」且不含目前這筆訂單的堂數，依月份分組
+// 餵給 evaluateOrderPricing 的 priorMonthlyCounts 參數用（筆記第2、10點：同月累積／跨月疊加）
+// 只算 order.status === 'confirmed' 的訂單、且該堂課本身 result === 'confirmed'（沒被取消）
+function computePriorMonthlyCounts(allOrders, studentId, poolKey, excludeOrderId) {
+  const counts = {};
+  (allOrders || []).forEach(o => {
+    if (o.studentId !== studentId || o.id === excludeOrderId) return;
+    if (o.status !== 'confirmed') return;
+    (o.courses || []).forEach(c => {
+      if (c.result !== 'confirmed') return;
+      const cs = courses.find(x => x.id === c.courseId) || { title: c.title };
+      if (getPoolKey(cs) !== poolKey) return;
+      const mk = courseMonthKey(c.dateStr);
+      counts[mk] = (counts[mk] || 0) + 1;
+    });
+  });
+  return counts;
+}
+
+// 算一筆訂單的建議金額（審核頁顯示用）。
+// 一筆訂單可能橫跨多個 poolKey（例如同時報空瑜跟皮拉提斯），要分開套各自的規則再加總；
+// 沒有規則的課程類別維持原價（evaluateOrderPricing 本身就會處理，這裡不用特別判斷）。
+// 已經被老師標記 c.result === 'cancelled' 的課程不計價；還沒決定的（result 未定）先當作會確認來估價，
+// 這樣老師在還沒點完 ✓/✕ 之前，也能先看到大概的建議金額
+function computeOrderSuggestedAmount(order, allOrders) {
+  const rawSum = (order.courses || []).reduce((sum, c) => sum + (c.price || 0), 0);
+  if (!order.studentId) return { total: rawSum, discountedMonths: [] }; // 訪客訂單沒有堂數池可累積，維持原邏輯
+
+  const coursesByPool = {};
+  (order.courses || []).forEach(c => {
+    if (c.result === 'cancelled') return;
+    const cs = courses.find(x => x.id === c.courseId) || { title: c.title };
+    const pk = getPoolKey(cs);
+    (coursesByPool[pk] = coursesByPool[pk] || []).push(c);
+  });
+
+  let total = 0;
+  const discountedMonths = [];
+  Object.entries(coursesByPool).forEach(([pk, list]) => {
+    const priorMonthlyCounts = computePriorMonthlyCounts(allOrders, order.studentId, pk, order.id);
+    const result = evaluateOrderPricing({ poolKey: pk, newCourses: list, priorMonthlyCounts });
+    total += result.totalAmount;
+    if (result.anyDiscountApplied) {
+      discountedMonths.push({ poolKey: pk, months: [...result.monthsMeetingThreshold] });
+    }
+  });
+  // 沒有被歸進任何 poolKey 分組的課程（理論上不會發生，防呆用）不會漏算，
+  // 因為 coursesByPool 是從 order.courses 直接分組來的，總數一定對得起來
+  return { total, discountedMonths };
+}
+
 function studentDocRef(tid, studentId) {
   return doc(db, 'teachers', tid, 'students', studentId);
 }
@@ -3032,11 +3085,21 @@ function renderAdmin() {
           </div>
         `).join('');
 
-        // 自動加總金額
-        const autoAmount = (order.courses || []).reduce((sum, c) => sum + (c.price || 0), 0);
+        // 建議金額：有學生ID的訂單套用優惠規則計算，訪客訂單維持原本單純加總
+        const pricing = computeOrderSuggestedAmount(order, orders);
+        const autoAmount = pricing.total;
         const savedAmount = localStorage.getItem(`amount_draft_${order.id}`);
         const displayAmount = savedAmount != null ? savedAmount : (order.amount != null ? order.amount : autoAmount);
         const isPaid = order.paid === true;
+
+        // 已套用優惠的提示（只是提示文字，金額本身老師仍可在下面手動覆蓋）
+        const discountNoteHtml = pricing.discountedMonths.length ? `
+          <div class="order-discount-note">🎉 已套用優惠：${pricing.discountedMonths.map(d => {
+            const rule = getDiscountRule(d.poolKey);
+            const monthNums = d.months.map(mk => parseInt(mk.split('-')[1], 10)).sort((a, b) => a - b).join('、');
+            return `${poolLabel(d.poolKey)} ${monthNums}月份滿${rule ? rule.threshold : ''}堂`;
+          }).join('；')}</div>
+        ` : '';
 
         const amountHtml = `
           <div class="order-amount-row">
@@ -3045,6 +3108,7 @@ function renderAdmin() {
             <button class="order-paid-btn ${isPaid ? 'paid' : ''}" data-id="${order.id}">${isPaid ? '✓ 已付款' : '未付款'}</button>
             <button class="order-amount-save-btn" data-id="${order.id}">儲存金額</button>
           </div>
+          ${discountNoteHtml}
         `;
 
         const bulkActionHtml = isPending ? `
