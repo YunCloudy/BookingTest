@@ -3920,7 +3920,6 @@ function renderAdmin() {
             <div class="order-student-name">${s.studentName}</div>
             ${expiryLine}
           </div>
-          ${s.studentEmail ? `<div class="credit-expiry-note">${s.studentEmail}</div>` : ''}
           <div class="credit-tags" style="margin:6px 0 0">
             ${poolEntries.length
               ? poolEntries.map(([pk, v]) => `<span class="credit-tag">${poolLabel(pk)}　剩餘 <b>${v}</b> 堂</span>`).join('')
@@ -3930,7 +3929,7 @@ function renderAdmin() {
             <div style="display:flex; gap:8px; flex-wrap:wrap;">
               <button class="credit-manual-toggle" type="button">✍️手動調整堂數</button>
               <button class="credit-extend-btn" type="button" data-student-id="${s.studentId}" data-student-name="${s.studentName}">📅延展到期日</button>
-              <button class="credit-zero-btn" type="button" data-student-id="${s.studentId}" data-student-name="${s.studentName}">歸零</button>
+              <button class="credit-zero-btn" type="button" data-student-id="${s.studentId}" data-student-name="${s.studentName}">🧹堂數歸零</button>
             </div>
             <div class="credit-manual-form" style="display:none">
               <select class="credit-manual-pool">
@@ -3986,7 +3985,7 @@ function renderAdmin() {
             renderStudentSection();
           } catch (e) {
             showToast('操作失敗，請再試一次');
-            btn.textContent = '歸零'; btn.disabled = false;
+            btn.textContent = '🧹堂數歸零'; btn.disabled = false;
           }
         });
       });
