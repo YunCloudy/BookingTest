@@ -721,10 +721,26 @@ main { padding: 20px 16px 40px; max-width: 680px; margin: 0 auto; }
   margin: 22px 0 10px;
 }
 
+.admin-subtitle {
+  font-size: 0.8rem;
+  color: var(--oat);
+  opacity: 0.75;
+  margin: 6px 0 8px;
+}
+
 .admin-tab-bar {
   display: flex;
   gap: 8px;
   margin-bottom: 16px;
+}
+
+/* v3.4：主要後台分頁改兩行（首頁/課程/優惠規則、訂單/請假/學生），
+   只加在這個組合 class 上，避免影響到別處重複使用 .admin-tab-bar 的篩選列（例如訂單管理的待審核/已審核） */
+.admin-tab-bar-main {
+  flex-wrap: wrap;
+}
+.admin-tab-bar-main .admin-tab {
+  flex: 0 0 calc(33.333% - 6px);
 }
 
 .admin-tab {
@@ -743,6 +759,52 @@ main { padding: 20px 16px 40px; max-width: 680px; margin: 0 auto; }
   color: var(--mocha);
   border-color: var(--latte);
   font-weight: 600;
+}
+
+/* v3.4 優惠規則頁 */
+.pricing-rule-card { margin-bottom: 14px; }
+.pricing-rule-form { margin-top: 8px; }
+.pricing-rule-row {
+  font-size: 0.88rem;
+  color: var(--oat);
+  margin-bottom: 10px;
+  line-height: 1.8;
+}
+.pricing-rule-input {
+  width: 60px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  border: 1px solid var(--mocha-light);
+  background: var(--mocha-dark, #2a1f1a);
+  color: var(--oat);
+  text-align: center;
+  font-size: 0.9rem;
+}
+.pricing-rule-toggle-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 0.82rem;
+  color: var(--oat);
+  opacity: 0.9;
+  line-height: 1.5;
+}
+.pricing-rule-save-btn {
+  padding: 8px 16px;
+  border-radius: var(--radius);
+  border: none;
+  background: var(--rose, #c97b6d);
+  color: #fff;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.pricing-rule-save-btn:disabled { opacity: 0.6; cursor: default; }
+.pricing-rule-placeholder {
+  color: var(--mocha-light);
+  font-size: 0.85rem;
+  font-style: italic;
+  text-align: center;
+  padding: 20px 14px;
 }
 
 .admin-card {

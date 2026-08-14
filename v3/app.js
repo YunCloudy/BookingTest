@@ -295,24 +295,48 @@ function allPoolKeys() {
 }
 
 // ══════════════════════════════════════════
-// ── 優惠規則 (v3.4 Phase 1) ──
-// 目前先寫死「空瑜常態團課」一條（對應設計筆記第1、6點）。
-// Phase 2 優惠管理頁面上線後，這裡改成從 Firestore 讀取每個老師自訂的規則清單即可，
-// 下面計算函式吃的介面（rule = {threshold, unitPrice, crossMonthEnabled}）不用變。
+// ── 優惠規則 (v3.4) ──
+// 「空瑜常態團課」這條預設規則寫死在 DEFAULT_DISCOUNT_RULES 裡，不用老師新增就存在。
+// 實際生效的規則存在 discountRulesCache，開機先用預設值墊著，
+// 進「優惠規則」分頁或「訂單管理」分頁時會從 Firestore 讀最新的蓋過去（loadDiscountRules）。
+// 這樣底下 evaluateOrderPricing() 那些計算函式都還是同步呼叫 getDiscountRule()，不用整串改成 async。
 //
 // 欄位說明：
-//   threshold          → 滿幾堂（筆記第4點：可自訂，不寫死4）
+//   threshold          → 滿幾堂
 //   unitPrice           → 達標後每堂的價格
 //   crossMonthEnabled   → 跨月套用優惠開關，規則層級（筆記第3點）
 //                         條件：「同一筆訂單本身橫跨兩個月、且這筆訂單本身滿N堂」才吃這個開關，
 //                         跟「同月分開下單累積達標」是兩件事，後者不受這個開關影響（一定套用）
+//
+// 「新增規則」（其他課程類別的優惠設定）維持筆記原本規劃：先放「功能開發中」，v3.4上線後訪談老師再做
 // ══════════════════════════════════════════
-const DISCOUNT_RULES = {
+const DEFAULT_DISCOUNT_RULES = {
   aerial_regular: { threshold: 4, unitPrice: 450, crossMonthEnabled: false }
 };
+let discountRulesCache = { ...DEFAULT_DISCOUNT_RULES };
 
 function getDiscountRule(poolKey) {
-  return DISCOUNT_RULES[poolKey] || null;
+  return discountRulesCache[poolKey] || null;
+}
+
+// 從 Firestore 讀老師自訂過的規則，蓋掉快取（沒存過的欄位維持預設值）
+async function loadDiscountRules(tid) {
+  if (!tid) return discountRulesCache;
+  try {
+    const snap = await getDoc(doc(db, 'teachers', tid, 'settings', 'discountRules'));
+    discountRulesCache = { ...DEFAULT_DISCOUNT_RULES, ...(snap.exists() ? (snap.data().rules || {}) : {}) };
+  } catch (e) {
+    console.warn('讀取優惠規則失敗，先用預設值', e);
+  }
+  return discountRulesCache;
+}
+
+// 老師在「優惠規則」頁改完存檔
+async function saveDiscountRule(tid, poolKey, rule) {
+  const next = { ...discountRulesCache, [poolKey]: rule };
+  await setDoc(doc(db, 'teachers', tid, 'settings', 'discountRules'), { rules: next }, { merge: true });
+  discountRulesCache = next;
+  return next;
 }
 
 // dateStr（"2026-05-20"）→ 月份 key（"2026-05"），用來判斷「同一個月」
@@ -2539,10 +2563,11 @@ function renderAdmin() {
   let currentAdminTab = 'home';
 
   const tabBar = document.createElement('div');
-  tabBar.className = 'admin-tab-bar';
+  tabBar.className = 'admin-tab-bar admin-tab-bar-main';
   tabBar.innerHTML = `
     <button class="admin-tab active" data-tab="home">首頁管理</button>
     <button class="admin-tab" data-tab="course">課程管理</button>
+    <button class="admin-tab" data-tab="pricing">優惠規則</button>
     <button class="admin-tab" data-tab="orders">訂單管理</button>
     <button class="admin-tab" data-tab="leave">請假管理</button>
     <button class="admin-tab" data-tab="students">學生管理</button>
@@ -2555,6 +2580,10 @@ function renderAdmin() {
   const courseSection = document.createElement('div');
   courseSection.id = 'adminCourseSection';
   courseSection.style.display = 'none';
+
+  const pricingSection = document.createElement('div');
+  pricingSection.id = 'adminPricingSection';
+  pricingSection.style.display = 'none';
 
   const orderSection = document.createElement('div');
   orderSection.id = 'adminOrderSection';
@@ -2570,6 +2599,7 @@ function renderAdmin() {
 
   body.appendChild(homeSection);
   body.appendChild(courseSection);
+  body.appendChild(pricingSection);
   body.appendChild(orderSection);
   body.appendChild(leaveSection);
   body.appendChild(studentSection);
@@ -2580,6 +2610,7 @@ function renderAdmin() {
       btn.classList.add('active');
       homeSection.style.display = 'none';
       courseSection.style.display = 'none';
+      pricingSection.style.display = 'none';
       orderSection.style.display = 'none';
       leaveSection.style.display = 'none';
       studentSection.style.display = 'none';
@@ -2587,6 +2618,9 @@ function renderAdmin() {
         homeSection.style.display = 'block';
       } else if (btn.dataset.tab === 'course') {
         courseSection.style.display = 'block';
+      } else if (btn.dataset.tab === 'pricing') {
+        pricingSection.style.display = 'block';
+        renderPricingSection();
       } else if (btn.dataset.tab === 'orders') {
         orderSection.style.display = 'block';
         renderOrderSection();
@@ -2917,11 +2951,92 @@ function renderAdmin() {
     });
   }
 
+  // ── 優惠規則 ──
+  async function renderPricingSection() {
+    pricingSection.innerHTML = '<div class="admin-section-title">優惠規則</div><div style="padding:16px;color:#aaa;font-size:0.85rem">載入中…</div>';
+    const tid = teacherId || TEACHER_ID_STATIC;
+    await loadDiscountRules(tid);
+
+    pricingSection.innerHTML = '';
+    const title = document.createElement('div');
+    title.className = 'admin-section-title';
+    title.textContent = '優惠規則';
+    pricingSection.appendChild(title);
+
+    const appliedTitle = document.createElement('div');
+    appliedTitle.className = 'admin-subtitle';
+    appliedTitle.textContent = '已套用規則';
+    pricingSection.appendChild(appliedTitle);
+
+    // 目前只有空瑜常態團課這一條（不用老師新增就先預設在程式碼裡），之後有多條規則時這裡改成迴圈渲染即可
+    Object.entries(discountRulesCache).forEach(([poolKey, rule]) => {
+      const card = document.createElement('div');
+      card.className = 'admin-card pricing-rule-card';
+      card.innerHTML = `
+        <div class="order-student-name">${poolLabel(poolKey)}</div>
+        <div class="pricing-rule-form">
+          <div class="pricing-rule-row">
+            滿 <input class="pricing-rule-input" type="number" min="1" value="${rule.threshold}" data-field="threshold"> 堂，
+            每堂 <input class="pricing-rule-input" type="number" min="0" value="${rule.unitPrice}" data-field="unitPrice"> 元
+          </div>
+          <div class="pricing-rule-row">
+            <label class="pricing-rule-toggle-label">
+              <input type="checkbox" class="pricing-rule-toggle" data-field="crossMonthEnabled" ${rule.crossMonthEnabled ? 'checked' : ''}>
+              跨月套用優惠（單一訂單本身橫跨兩個月、且這筆訂單本身就滿門檻堂數時適用）
+            </label>
+          </div>
+          <button class="pricing-rule-save-btn" data-pool="${poolKey}">儲存</button>
+        </div>
+      `;
+      pricingSection.appendChild(card);
+    });
+
+    // 新增規則（其他課程類別）── 照筆記原本規劃，v3.4上線後訪談老師再設計，先放佔位文字
+    const addTitle = document.createElement('div');
+    addTitle.className = 'admin-subtitle';
+    addTitle.style.marginTop = '18px';
+    addTitle.textContent = '新增規則';
+    pricingSection.appendChild(addTitle);
+
+    const addPlaceholder = document.createElement('div');
+    addPlaceholder.className = 'admin-card pricing-rule-placeholder';
+    addPlaceholder.textContent = '功能開發中，有任何想法都可以聯繫開發者討論';
+    pricingSection.appendChild(addPlaceholder);
+
+    // ── 儲存按鈕 ──
+    pricingSection.querySelectorAll('.pricing-rule-save-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const poolKey = btn.dataset.pool;
+        const card = btn.closest('.pricing-rule-card');
+        const threshold = parseInt(card.querySelector('[data-field="threshold"]').value, 10);
+        const unitPrice = parseInt(card.querySelector('[data-field="unitPrice"]').value, 10);
+        const crossMonthEnabled = card.querySelector('[data-field="crossMonthEnabled"]').checked;
+
+        if (!threshold || threshold < 1 || isNaN(unitPrice) || unitPrice < 0) {
+          showToast('請輸入正確的堂數／金額');
+          return;
+        }
+        if (!confirm(`確定要把「${poolLabel(poolKey)}」的優惠規則改成「滿${threshold}堂、每堂${unitPrice}元、跨月套用優惠：${crossMonthEnabled ? '是' : '否'}」嗎？\n\n這只會影響之後新審核的訂單，已經審核完成的舊訂單金額不會回頭重算。`)) return;
+
+        btn.textContent = '儲存中…'; btn.disabled = true;
+        try {
+          await saveDiscountRule(tid, poolKey, { threshold, unitPrice, crossMonthEnabled });
+          showToast('規則已更新');
+          btn.textContent = '儲存'; btn.disabled = false;
+        } catch (e) {
+          showToast('儲存失敗，請再試一次');
+          btn.textContent = '儲存'; btn.disabled = false;
+        }
+      });
+    });
+  }
+
   // ── 訂單管理 ──
   async function renderOrderSection() {
     orderSection.innerHTML = '<div class="admin-section-title">訂單管理</div><div style="padding:16px;color:#aaa;font-size:0.85rem">載入中…</div>';
 
     const tid = teacherId || TEACHER_ID_STATIC;
+    await loadDiscountRules(tid); // 確保這次審核用的是最新規則（老師可能剛在「優惠規則」頁改過）
     let orders = [];
     try {
       const snap = await getDocs(collection(db, 'teachers', tid, 'orders'));
