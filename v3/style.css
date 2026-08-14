@@ -791,20 +791,14 @@ main { padding: 20px 16px 40px; max-width: 680px; margin: 0 auto; }
   line-height: 1.5;
 }
 .pricing-rule-save-btn {
-  background: transparent;
-  border: 1px solid var(--latte);
-  color: var(--latte-light);
-  padding: 3px 12px;
-  border-radius: 20px;
+  background: var(--rose-dark);
+  border: none;
+  color: var(--white);
+  padding: 8px 24px;
+  border-radius: 8px;
   font-size: 0.85rem;
   cursor: pointer;
   font-family: 'Noto Sans TC', sans-serif;
-  transition: all 0.2s;
-}
-.pricing-rule-save-btn:active {
-  background: var(--rose-dark);
-  border-color: var(--rose-dark);
-  color: var(--white);
 }
 .pricing-rule-save-btn:disabled { opacity: 0.6; cursor: default; }
 .pricing-rule-placeholder {

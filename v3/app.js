@@ -392,8 +392,15 @@ function evaluateOrderPricing({ poolKey, newCourses, priorMonthlyCounts = {} }) 
 
   if (isCrossMonthOrder && orderOwnCount >= rule.threshold && rule.crossMonthEnabled) {
     // 筆記第3點：訂單本身跨月＋本身就滿N堂＋開關開 → 整筆全部套優惠，不用管其他月份累積
-    // 機制A：這幾個月份都是被「這張訂單自己」帶動達標的
-    monthsTouched.forEach(mk => { monthsMeetingThreshold.add(mk); monthMechanism[mk] = 'A'; });
+    // 但逐月再檢查一次：如果某個月「光靠這筆訂單自己在該月的堂數（含之前累積）」就已經達標，
+    // 這個月其實不需要跨月合併也會過關，畫面文字要當成「該月累積達標」（機制B）處理，
+    // 只有真的需要靠跨月合併才夠的月份，才算機制A（不列月份，只講「單筆訂單滿N堂」）
+    monthsTouched.forEach(mk => {
+      monthsMeetingThreshold.add(mk);
+      const priorCount = priorMonthlyCounts[mk] || 0;
+      const wouldQualifyAlone = (priorCount + byMonth[mk].length) >= rule.threshold;
+      monthMechanism[mk] = wouldQualifyAlone ? 'B' : 'A';
+    });
   } else {
     // 筆記第2、10點：逐月判斷「該月已審核堂數（含疊加）＋這筆訂單在該月的堂數」是否達標
     // 訂單本身跨月但開關沒開時，一樣走這條路，各月份各自獨立判斷，不會整筆套用
@@ -2987,8 +2994,8 @@ function renderAdmin() {
             滿 <input class="pricing-rule-input" type="number" min="1" value="${rule.threshold}" data-field="threshold"> 堂，
             每堂 <input class="pricing-rule-input" type="number" min="0" value="${rule.unitPrice}" data-field="unitPrice"> 元
           </div>
-          <div class="pricing-rule-row toggle-row">
-            <label class="toggle">
+          <div class="pricing-rule-row toggle-row" style="align-items:flex-start">
+            <label class="toggle" style="flex-shrink:0;margin-top:1px">
               <input type="checkbox" class="pricing-rule-toggle" data-field="crossMonthEnabled" ${rule.crossMonthEnabled ? 'checked' : ''}>
               <span class="toggle-slider"></span>
             </label>
@@ -3217,15 +3224,15 @@ function renderAdmin() {
         const isPaid = order.paid === true;
 
         // 已套用優惠的提示（只是提示文字，金額本身老師仍可在下面手動覆蓋）
-        // 機制A（訂單自己跨月又滿門檻）跟機制B（逐月累積湊到）分開講，避免老師搞不清楚是哪種情況觸發的
+        // 機制A（真的需要跨月合併才達標，不列月份）跟機制B（單月靠累積就達標，含「跨月訂單裡剛好某個月自己就夠」的情況）分開講
         const discountNoteHtml = pricing.discountedMonths.length ? `
           <div class="order-discount-note">🎉 已套用優惠：${pricing.discountedMonths.map(d => {
             const rule = getDiscountRule(d.poolKey);
             const threshold = rule ? rule.threshold : '';
-            const monthsA = d.months.filter(mk => d.monthMechanism[mk] === 'A').map(mk => parseInt(mk.split('-')[1], 10)).sort((a, b) => a - b);
+            const hasA = d.months.some(mk => d.monthMechanism[mk] === 'A');
             const monthsB = d.months.filter(mk => d.monthMechanism[mk] === 'B').map(mk => parseInt(mk.split('-')[1], 10)).sort((a, b) => a - b);
             const parts = [];
-            if (monthsA.length) parts.push(`${poolLabel(d.poolKey)}訂單本身跨${monthsA.join('、')}月且滿${threshold}堂`);
+            if (hasA) parts.push(`${poolLabel(d.poolKey)}單筆訂單滿${threshold}堂`);
             if (monthsB.length) parts.push(`${poolLabel(d.poolKey)} ${monthsB.join('、')}月份累積滿${threshold}堂`);
             return parts.join('；');
           }).join('；')}</div>
