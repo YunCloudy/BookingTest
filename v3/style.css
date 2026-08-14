@@ -772,13 +772,14 @@ main { padding: 20px 16px 40px; max-width: 680px; margin: 0 auto; }
 }
 .pricing-rule-input {
   width: 60px;
-  padding: 4px 6px;
-  border-radius: 6px;
-  border: 1px solid var(--mocha-light);
-  background: var(--mocha-dark, #2a1f1a);
+  border: none;
+  border-bottom: 1px solid var(--latte);
+  background: transparent;
   color: var(--oat);
   text-align: center;
   font-size: 0.9rem;
+  padding: 0 2px;
+  outline: none;
 }
 .pricing-rule-toggle-label {
   display: flex;
@@ -790,13 +791,20 @@ main { padding: 20px 16px 40px; max-width: 680px; margin: 0 auto; }
   line-height: 1.5;
 }
 .pricing-rule-save-btn {
-  padding: 8px 16px;
-  border-radius: var(--radius);
-  border: none;
-  background: var(--rose, #c97b6d);
-  color: #fff;
+  background: transparent;
+  border: 1px solid var(--latte);
+  color: var(--latte-light);
+  padding: 3px 12px;
+  border-radius: 20px;
   font-size: 0.85rem;
   cursor: pointer;
+  font-family: 'Noto Sans TC', sans-serif;
+  transition: all 0.2s;
+}
+.pricing-rule-save-btn:active {
+  background: var(--rose-dark);
+  border-color: var(--rose-dark);
+  color: var(--white);
 }
 .pricing-rule-save-btn:disabled { opacity: 0.6; cursor: default; }
 .pricing-rule-placeholder {

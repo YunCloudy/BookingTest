@@ -358,6 +358,8 @@ function courseMonthKey(dateStr) {
 // 回傳：
 //   perCourse              → 每堂課附上 appliedPrice（實際套用金額）、discounted（是否套到優惠價）
 //   monthsMeetingThreshold → 這筆訂單裡有達標的月份集合（給「已套用優惠」mark 用）
+//   monthMechanism         → { [monthKey]: 'A' | 'B' }，該月份是靠機制A（訂單自己跨月又滿門檻）
+//                             還是機制B（逐月累積湊到）達標，給畫面分開顯示文字用
 //   totalAmount            → 建議總金額（老師仍可在 UI 手動覆蓋，這裡只給建議值）
 //   anyDiscountApplied     → 這筆訂單是否至少有一部分套到優惠
 function evaluateOrderPricing({ poolKey, newCourses, priorMonthlyCounts = {} }) {
@@ -369,6 +371,7 @@ function evaluateOrderPricing({ poolKey, newCourses, priorMonthlyCounts = {} }) 
     return {
       perCourse: courseList.map(c => ({ ...c, appliedPrice: c.price, discounted: false })),
       monthsMeetingThreshold: new Set(),
+      monthMechanism: {},
       totalAmount: courseList.reduce((s, c) => s + (c.price || 0), 0),
       anyDiscountApplied: false
     };
@@ -385,18 +388,22 @@ function evaluateOrderPricing({ poolKey, newCourses, priorMonthlyCounts = {} }) 
   const orderOwnCount = courseList.length;
 
   const monthsMeetingThreshold = new Set();
+  const monthMechanism = {};
 
   if (isCrossMonthOrder && orderOwnCount >= rule.threshold && rule.crossMonthEnabled) {
     // 筆記第3點：訂單本身跨月＋本身就滿N堂＋開關開 → 整筆全部套優惠，不用管其他月份累積
-    monthsTouched.forEach(mk => monthsMeetingThreshold.add(mk));
+    // 機制A：這幾個月份都是被「這張訂單自己」帶動達標的
+    monthsTouched.forEach(mk => { monthsMeetingThreshold.add(mk); monthMechanism[mk] = 'A'; });
   } else {
     // 筆記第2、10點：逐月判斷「該月已審核堂數（含疊加）＋這筆訂單在該月的堂數」是否達標
     // 訂單本身跨月但開關沒開時，一樣走這條路，各月份各自獨立判斷，不會整筆套用
+    // 機制B：這個月是靠累積（可能橫跨多筆訂單）湊到的
     monthsTouched.forEach(mk => {
       const priorCount = priorMonthlyCounts[mk] || 0;
       const thisMonthNew = byMonth[mk].length;
       if (priorCount + thisMonthNew >= rule.threshold) {
         monthsMeetingThreshold.add(mk);
+        monthMechanism[mk] = 'B';
       }
     });
   }
@@ -410,6 +417,7 @@ function evaluateOrderPricing({ poolKey, newCourses, priorMonthlyCounts = {} }) 
   return {
     perCourse,
     monthsMeetingThreshold,
+    monthMechanism,
     totalAmount: perCourse.reduce((s, c) => s + c.appliedPrice, 0),
     anyDiscountApplied: monthsMeetingThreshold.size > 0
   };
@@ -471,7 +479,7 @@ function computeOrderSuggestedAmount(order, allOrders) {
     const result = evaluateOrderPricing({ poolKey: pk, newCourses: list, priorMonthlyCounts });
     total += result.totalAmount;
     if (result.anyDiscountApplied) {
-      discountedMonths.push({ poolKey: pk, months: [...result.monthsMeetingThreshold] });
+      discountedMonths.push({ poolKey: pk, months: [...result.monthsMeetingThreshold], monthMechanism: result.monthMechanism });
     }
   });
   // 沒有被歸進任何 poolKey 分組的課程（理論上不會發生，防呆用）不會漏算，
@@ -2567,7 +2575,7 @@ function renderAdmin() {
   tabBar.innerHTML = `
     <button class="admin-tab active" data-tab="home">首頁管理</button>
     <button class="admin-tab" data-tab="course">課程管理</button>
-    <button class="admin-tab" data-tab="pricing">優惠規則</button>
+    <button class="admin-tab" data-tab="pricing">優惠管理</button>
     <button class="admin-tab" data-tab="orders">訂單管理</button>
     <button class="admin-tab" data-tab="leave">請假管理</button>
     <button class="admin-tab" data-tab="students">學生管理</button>
@@ -2953,14 +2961,14 @@ function renderAdmin() {
 
   // ── 優惠規則 ──
   async function renderPricingSection() {
-    pricingSection.innerHTML = '<div class="admin-section-title">優惠規則</div><div style="padding:16px;color:#aaa;font-size:0.85rem">載入中…</div>';
+    pricingSection.innerHTML = '<div class="admin-section-title">優惠管理</div><div style="padding:16px;color:#aaa;font-size:0.85rem">載入中…</div>';
     const tid = teacherId || TEACHER_ID_STATIC;
     await loadDiscountRules(tid);
 
     pricingSection.innerHTML = '';
     const title = document.createElement('div');
     title.className = 'admin-section-title';
-    title.textContent = '優惠規則';
+    title.textContent = '優惠管理';
     pricingSection.appendChild(title);
 
     const appliedTitle = document.createElement('div');
@@ -2979,11 +2987,12 @@ function renderAdmin() {
             滿 <input class="pricing-rule-input" type="number" min="1" value="${rule.threshold}" data-field="threshold"> 堂，
             每堂 <input class="pricing-rule-input" type="number" min="0" value="${rule.unitPrice}" data-field="unitPrice"> 元
           </div>
-          <div class="pricing-rule-row">
-            <label class="pricing-rule-toggle-label">
+          <div class="pricing-rule-row toggle-row">
+            <label class="toggle">
               <input type="checkbox" class="pricing-rule-toggle" data-field="crossMonthEnabled" ${rule.crossMonthEnabled ? 'checked' : ''}>
-              跨月套用優惠（單一訂單本身橫跨兩個月、且這筆訂單本身就滿門檻堂數時適用）
+              <span class="toggle-slider"></span>
             </label>
+            <span class="toggle-label">跨月套用優惠（單一訂單本身橫跨兩個月、且這筆訂單本身就滿門檻堂數時適用）</span>
           </div>
           <button class="pricing-rule-save-btn" data-pool="${poolKey}">儲存</button>
         </div>
@@ -3208,11 +3217,17 @@ function renderAdmin() {
         const isPaid = order.paid === true;
 
         // 已套用優惠的提示（只是提示文字，金額本身老師仍可在下面手動覆蓋）
+        // 機制A（訂單自己跨月又滿門檻）跟機制B（逐月累積湊到）分開講，避免老師搞不清楚是哪種情況觸發的
         const discountNoteHtml = pricing.discountedMonths.length ? `
           <div class="order-discount-note">🎉 已套用優惠：${pricing.discountedMonths.map(d => {
             const rule = getDiscountRule(d.poolKey);
-            const monthNums = d.months.map(mk => parseInt(mk.split('-')[1], 10)).sort((a, b) => a - b).join('、');
-            return `${poolLabel(d.poolKey)} ${monthNums}月份滿${rule ? rule.threshold : ''}堂`;
+            const threshold = rule ? rule.threshold : '';
+            const monthsA = d.months.filter(mk => d.monthMechanism[mk] === 'A').map(mk => parseInt(mk.split('-')[1], 10)).sort((a, b) => a - b);
+            const monthsB = d.months.filter(mk => d.monthMechanism[mk] === 'B').map(mk => parseInt(mk.split('-')[1], 10)).sort((a, b) => a - b);
+            const parts = [];
+            if (monthsA.length) parts.push(`${poolLabel(d.poolKey)}訂單本身跨${monthsA.join('、')}月且滿${threshold}堂`);
+            if (monthsB.length) parts.push(`${poolLabel(d.poolKey)} ${monthsB.join('、')}月份累積滿${threshold}堂`);
+            return parts.join('；');
           }).join('；')}</div>
         ` : '';
 
