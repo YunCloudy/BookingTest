@@ -75,16 +75,16 @@ let cart = []; // [{ courseId, title, date, time, price }]
 // 中公告：按課程類別
 const categories = [
   {
-    id: 'pilates',
-    label: '皮拉提斯',
-    subcats: ['器械皮拉提斯', '墊上皮拉提斯'],
-    announceMid: '因教室租借費用調漲，費用有調整喔🙏'
-  },
-  {
     id: 'aerial',
     label: '空中瑜珈',
     subcats: ['常態團課', '許願加開'],
     announceMid: ''
+  },
+  {
+    id: 'pilates',
+    label: '皮拉提斯',
+    subcats: ['器械皮拉提斯', '墊上皮拉提斯'],
+    announceMid: '因教室租借費用調漲，費用有調整喔🙏'
   },
  {
     id: 'circus',
@@ -915,6 +915,11 @@ function renderList() {
   const wrap = document.getElementById('listView');
   wrap.innerHTML = '';
 
+  // v3.4：已結束「月份」自動隱藏（只濾掉整個過去的月份，本月即使已過去幾天也照常顯示）
+  // 只套用在學生視角，老師自己還是要看得到舊課程（管理、複製當範本用）
+  const thisMonthKey = courseMonthKey(new Date().toISOString().slice(0, 10));
+  const visibleCourses = isAdmin() ? courses : courses.filter(c => courseMonthKey(c.dateStr) >= thisMonthKey);
+
   function buildCard(c) {
     const { state, remaining } = courseStatus(c);
     const isFull = state === 'full' || state === 'closed' || state === 'cancelled';
@@ -1275,10 +1280,10 @@ function renderList() {
 
   if (currentCat === 'all') {
     const sorted = [
-  ...courses
+  ...visibleCourses
     .filter(c => { const s = courseStatus(c).state; return s === 'open' || s === 'pending'; })
     .sort((a, b) => a.dateStr.localeCompare(b.dateStr)),
-  ...courses
+  ...visibleCourses
     .filter(c => { const s = courseStatus(c).state; return s === 'full' || s === 'closed' || s === 'cancelled'; })
     .sort((a, b) => a.dateStr.localeCompare(b.dateStr)),
     ];
@@ -1291,7 +1296,7 @@ function renderList() {
   } else {
     const catsToShow = categories.filter(cat => cat.id === currentCat);
     catsToShow.forEach(cat => {
-      let catCourses = courses.filter(c => c.cat === cat.id);
+      let catCourses = visibleCourses.filter(c => c.cat === cat.id);
       catCourses = [
   ...catCourses
     .filter(c => { const s = courseStatus(c).state; return s === 'open' || s === 'pending'; })
@@ -2285,15 +2290,22 @@ function showToast(msg) {
 function updateTeacherBtn() {
   const loginBtn = document.getElementById('loginBtn');
   const cartBtn = document.getElementById('cartBtn');
+  const teacherAdminBtn = document.getElementById('teacherAdminBtn');
   if (currentTeacher) {
     loginBtn.textContent = `${teacherName || '老師'} 🔒`;
     if (cartBtn) cartBtn.style.display = 'none';
+    if (teacherAdminBtn) teacherAdminBtn.style.display = '';
   } else if (!currentStudent) {
     loginBtn.textContent = '登入 ▾';
     if (cartBtn) cartBtn.style.display = '';
+    if (teacherAdminBtn) teacherAdminBtn.style.display = 'none';
   }
   updateNotifBtn();
 }
+
+document.getElementById('teacherAdminBtn').addEventListener('click', () => {
+  openAdmin();
+});
 
 document.getElementById('loginBtn').addEventListener('click', (e) => {
   e.stopPropagation();
@@ -2391,7 +2403,7 @@ document.getElementById('teacherGoogleLoginBtn').addEventListener('click', () =>
       splash.style.display = 'none';
       openAdmin();
       if (currentView === 'calendar') renderCalendar(); else renderList();
-    }, 1500);
+    }, 500);
   }).catch(e => {
     if (e.code !== 'auth/popup-closed-by-user') {
       document.getElementById('loginError').textContent = '登入失敗：' + (e.code || e.message);
