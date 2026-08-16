@@ -2403,7 +2403,7 @@ document.getElementById('teacherGoogleLoginBtn').addEventListener('click', () =>
       splash.style.display = 'none';
       openAdmin();
       if (currentView === 'calendar') renderCalendar(); else renderList();
-    }, 500);
+    }, 1500);
   }).catch(e => {
     if (e.code !== 'auth/popup-closed-by-user') {
       document.getElementById('loginError').textContent = '登入失敗：' + (e.code || e.message);
