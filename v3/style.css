@@ -1395,6 +1395,52 @@ main { padding: 20px 16px 40px; max-width: 680px; margin: 0 auto; }
 .cart-empty { color: #bbb; padding: 20px 0; font-size: 0.9rem; }
 .cart-divider { border-top: 1px solid var(--cream); margin: 12px 0; }
 .cart-field-label { text-align: left; font-size: 0.82rem; color: #7a6560; margin-bottom: 4px; margin-top: 10px; }
+
+/* 購物車：已登入且資料完整時的唯讀個人資料摘要 */
+.cart-profile-summary {
+  text-align: left;
+  background: var(--latte-pale, #f5f0ee);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-top: 4px;
+}
+.cart-profile-summary-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+  margin-bottom: 6px;
+}
+.cart-edit-link {
+  background: none;
+  border: none;
+  color: var(--rose-dark);
+  font-size: 0.78rem;
+  cursor: pointer;
+  padding: 0;
+}
+.cart-profile-summary-row {
+  font-size: 0.92rem;
+  color: var(--ink);
+  padding: 2px 0;
+}
+.cart-summary-key { color: var(--ink-soft); margin-right: 8px; }
+
+/* 個人資料彈窗：「其他資料」收合區塊 */
+.profile-more-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  font-size: 0.82rem;
+  color: var(--rose-dark);
+  padding: 8px 0;
+  margin-top: 4px;
+  border-top: 1px solid var(--rose-light);
+}
+.profile-more-arrow { transition: transform 0.15s ease; }
+.profile-more-section.collapsed { display: none; }
 .cart-added-label { color: var(--ink-soft); font-size: 0.85rem; margin-bottom: 6px; text-align: center; }
 .btn-cart { width: 100%; padding: 14px; background: var(--latte-pale); color: var(--brown-dark); border: none; border-radius: var(--radius); font-size: 1rem; font-weight: 600; cursor: pointer; transition: opacity 0.2s; text-align: center; }
 .btn-cart:hover { opacity: 0.8; }

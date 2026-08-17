@@ -53,6 +53,7 @@ let teacherId = null;        // 動態從 admins/{uid}.teacherId 拿
 let teacherName = null;     // 從 admins/{uid}.name 拿
 let currentTeacher = null;  // Google 登入的老師（Firebase User）
 let currentStudent = null;  // Google 登入的學生
+let pendingCartProfile = null; // 未登入時在購物車快速填寫的暱稱/電話/備註，登入成功後用來自動寫入個人資料並送出訂單
 let studentOrders = [];     // 學生登入後從 users/{uid}/orders/ 撈回來的訂單
 let currentStudentCredits = {}; // 學生登入後自己的未用堂數（從 users/{uid}.remainingCredits 讀，v3.3 第二階段）
 let currentStudentCreditExpiry = null; // 共用堂數到期日（從 users/{uid}.creditExpiry 讀，單一日期字串，v3.4）
@@ -2016,18 +2017,27 @@ function updateCartBtn() {
 function openCartOverlay() {
   renderCartOverlay();
   document.getElementById('cartOverlay').classList.add('open');
+  // 未登入時在購物車快速填寫過的資料，登入成功後這裡會自動接續寫入個人資料並送出訂單
+  if (pendingCartProfile && currentStudent) {
+    const p = pendingCartProfile;
+    pendingCartProfile = null;
+    autoSubmitAfterLogin(p);
+  }
 }
 
+// 判斷購物車該顯示「快速填寫表單」還是「唯讀個人資料摘要」：
+// 只要暱稱＋電話都已經存在個人資料裡，就不用購物車重複輸入
 function renderCartOverlay() {
   const itemsEl = document.getElementById('cartItems');
   const checkoutForm = document.getElementById('cartCheckoutForm');
-  const loginPrompt = document.getElementById('cartLoginPrompt');
+  const quickForm = document.getElementById('cartQuickForm');
+  const summary = document.getElementById('cartProfileSummary');
+  const submitBtn = document.getElementById('cartSubmitBtn');
   if (!itemsEl) return;
 
   if (cart.length === 0) {
     itemsEl.innerHTML = '<div class="cart-empty">購物車是空的</div>';
     checkoutForm.style.display = 'none';
-    loginPrompt.style.display = 'none';
     return;
   }
 
@@ -2045,19 +2055,36 @@ function renderCartOverlay() {
     btn.addEventListener('click', () => removeFromCart(+btn.dataset.id));
   });
 
+  checkoutForm.style.display = 'block';
+  submitBtn.textContent = currentStudent ? '送出訂單' : '登入以送出訂單';
+
   if (currentStudent) {
-    checkoutForm.style.display = 'block';
-    loginPrompt.style.display = 'none';
     getDoc(doc(db, 'users', currentStudent.uid)).then(snap => {
-      const nickname = snap.exists() ? (snap.data().nickname || '') : '';
-      const nameInput = document.getElementById('cartName');
-      if (nameInput && !nameInput.value) {
-        nameInput.value = nickname || currentStudent.displayName?.split(' ')[0] || '';
+      const data = snap.exists() ? snap.data() : {};
+      if (data.nickname && data.phone) {
+        quickForm.style.display = 'none';
+        summary.style.display = 'block';
+        document.getElementById('cartSummaryNickname').textContent = data.nickname;
+        document.getElementById('cartSummaryPhone').textContent = data.phone;
+      } else {
+        quickForm.style.display = 'block';
+        summary.style.display = 'none';
+        const nameInput = document.getElementById('cartName');
+        const phoneInput = document.getElementById('cartPhone');
+        if (nameInput && !nameInput.value) {
+          nameInput.value = data.nickname || currentStudent.displayName?.split(' ')[0] || '';
+        }
+        if (phoneInput && !phoneInput.value) {
+          phoneInput.value = data.phone || '';
+        }
       }
-    }).catch(() => {});
+    }).catch(() => {
+      quickForm.style.display = 'block';
+      summary.style.display = 'none';
+    });
   } else {
-    checkoutForm.style.display = 'none';
-    loginPrompt.style.display = 'block';
+    quickForm.style.display = 'block';
+    summary.style.display = 'none';
   }
 }
 
@@ -2190,30 +2217,72 @@ document.getElementById('notifBtn').addEventListener('click', (e) => {
 });
 
 async function submitOrder() {
-  // 未登入 → 跳登入，登入後自動重開購物車
+  if (cart.length === 0) return;
+
+  const usingQuickForm = document.getElementById('cartQuickForm').style.display !== 'none';
+  let name, phone;
+
+  if (usingQuickForm) {
+    const nameInput = document.getElementById('cartName');
+    const phoneInput = document.getElementById('cartPhone');
+    nameInput.style.borderColor = '';
+    phoneInput.style.borderColor = '';
+    name = nameInput.value.trim();
+    phone = phoneInput.value.trim();
+    if (!name) {
+      nameInput.style.borderColor = '#e74c3c';
+      nameInput.focus();
+      return;
+    }
+    if (!phone) {
+      phoneInput.style.borderColor = '#e74c3c';
+      phoneInput.focus();
+      return;
+    }
+  } else {
+    // 已登入且個人資料完整：直接沿用唯讀摘要顯示的暱稱/電話
+    name = document.getElementById('cartSummaryNickname').textContent;
+    phone = document.getElementById('cartSummaryPhone').textContent;
+  }
+
+  const note = document.getElementById('cartNote').value.trim().slice(0, 100);
+
+  // 未登入 → 先暫存這次填寫的資料，登入成功後在 openCartOverlay 自動接續寫入個人資料並送出訂單
   if (!currentStudent) {
+    pendingCartProfile = { name, phone, note };
     document.getElementById('cartOverlay').classList.remove('open');
     document.getElementById('studentLoginError').textContent = '';
     document.getElementById('studentLoginOverlay').classList.add('open');
     return;
   }
-  const name = document.getElementById('cartName').value.trim();
-  if (!name) {
-    document.getElementById('cartName').style.borderColor = '#e74c3c';
-    document.getElementById('cartName').focus();
-    return;
-  }
-  const phone = document.getElementById('cartPhone').value.trim();
-  const note = document.getElementById('cartNote').value.trim().slice(0, 100);
+
   const btn = document.getElementById('cartSubmitBtn');
   btn.textContent = '送出中…';
   btn.disabled = true;
 
+  try {
+    // 快速表單填寫的暱稱/電話，順便寫回個人資料，下次購物車就不用再填
+    if (usingQuickForm) {
+      await setDoc(doc(db, 'users', currentStudent.uid), { nickname: name, phone, email: currentStudent.email }, { merge: true });
+      updateStudentBtn(name);
+    }
+    await finalizeOrder(name, phone, note);
+  } catch(e) {
+    showToast('送出失敗，請再試一次');
+    btn.textContent = '送出訂單';
+    btn.disabled = false;
+  }
+}
+
+// 實際寫入訂單資料。從 submitOrder（已登入且資料備妥）
+// 或 autoSubmitAfterLogin（購物車快速填寫後、登入完成自動接續）呼叫
+async function finalizeOrder(name, phone, note) {
+  const btn = document.getElementById('cartSubmitBtn');
   const tid = teacherId || TEACHER_ID_STATIC;
   const orderId = 'order_' + Date.now();
   const orderData = {
     studentId: currentStudent.uid,
-    studentName: name,
+    studentName: name, // fallback 快照，正式顯示以 users/{uid}.nickname 為準
     studentEmail: currentStudent.email || '',
     phone,
     courses: cart.map(item => ({
@@ -2231,31 +2300,39 @@ async function submitOrder() {
     amount: null
   };
 
+  await setDoc(doc(db, 'teachers', tid, 'orders', orderId), orderData);
+  // 同時寫入學生端，方便學生查詢自己的訂單與審核結果
+  await setDoc(doc(db, 'users', currentStudent.uid, 'orders', orderId), {
+    ...orderData,
+    teacherId: tid
+  });
+  // 通知老師有新訂單申請
+  pushNotification('teachers', tid, {
+    type: 'new_order',
+    message: `您有一筆來自 ${name} 的課程申請`,
+    detail: courseSummaryText(orderData.courses)
+  });
+  // 更新本地 studentOrders（加在最前面，因為是最新的）
+  studentOrders.unshift({ id: orderId, ...orderData, teacherId: tid });
+  cart = [];
+  updateCartBtn();
+  btn.textContent = '送出訂單';
+  btn.disabled = false;
+  document.getElementById('cartOverlay').classList.remove('open');
+  showToast('訂單已送出！等待老師審核 ✨');
+}
+
+// 未登入時在購物車快速填寫過暱稱/電話 → 登入成功後自動寫入個人資料並送出訂單，
+// 使用者不用登入後再重打一次
+async function autoSubmitAfterLogin({ name, phone, note }) {
   try {
-    await setDoc(doc(db, 'teachers', tid, 'orders', orderId), orderData);
-    // 同時寫入學生端，方便學生查詢自己的訂單與審核結果
-    await setDoc(doc(db, 'users', currentStudent.uid, 'orders', orderId), {
-      ...orderData,
-      teacherId: tid
-    });
-    // 通知老師有新訂單申請
-    pushNotification('teachers', tid, {
-      type: 'new_order',
-      message: `您有一筆來自 ${name} 的課程申請`,
-      detail: courseSummaryText(orderData.courses)
-    });
-    // 更新本地 studentOrders（加在最前面，因為是最新的）
-    studentOrders.unshift({ id: orderId, ...orderData, teacherId: tid });
-    cart = [];
-    updateCartBtn();
-    btn.textContent = '送出訂單';
-    btn.disabled = false;
-    document.getElementById('cartOverlay').classList.remove('open');
-    showToast('訂單已送出！等待老師審核 ✨');
+    await setDoc(doc(db, 'users', currentStudent.uid), { nickname: name, phone, email: currentStudent.email }, { merge: true });
+    updateStudentBtn(name);
+    const noteEl = document.getElementById('cartNote');
+    if (noteEl) noteEl.value = note;
+    await finalizeOrder(name, phone, note);
   } catch(e) {
     showToast('送出失敗，請再試一次');
-    btn.textContent = '送出訂單';
-    btn.disabled = false;
   }
 }
 
@@ -2264,10 +2341,9 @@ document.getElementById('cartCloseBtn').addEventListener('click', () => {
   document.getElementById('cartOverlay').classList.remove('open');
 });
 document.getElementById('cartSubmitBtn').addEventListener('click', submitOrder);
-document.getElementById('cartLoginBtn').addEventListener('click', () => {
+document.getElementById('cartEditProfileLink').addEventListener('click', () => {
   document.getElementById('cartOverlay').classList.remove('open');
-  document.getElementById('studentLoginError').textContent = '';
-  document.getElementById('studentLoginOverlay').classList.add('open');
+  document.getElementById('studentProfileBtn').click();
 });
 
 function closeModal() {
@@ -2515,25 +2591,65 @@ document.getElementById('studentCreditClose').addEventListener('click', () => {
   document.getElementById('studentCreditOverlay').classList.remove('open');
 });
 
+// 「其他資料」收合區塊：只影響版面顯示，不影響必填驗證
+function setProfileMoreCollapsed(collapsed) {
+  const section = document.getElementById('studentProfileMoreSection');
+  const arrow = document.getElementById('studentProfileMoreArrow');
+  const label = document.getElementById('studentProfileMoreLabel');
+  section.classList.toggle('collapsed', collapsed);
+  arrow.textContent = collapsed ? '▸' : '▾';
+  label.textContent = collapsed ? '其他資料 ✓ 已填寫' : '其他資料';
+}
+
+document.getElementById('studentProfileMoreToggle').addEventListener('click', () => {
+  const section = document.getElementById('studentProfileMoreSection');
+  setProfileMoreCollapsed(!section.classList.contains('collapsed'));
+});
+
 document.getElementById('studentProfileBtn').addEventListener('click', async () => {
   document.getElementById('studentDropdown').classList.remove('open');
   document.getElementById('studentProfileEmail').textContent = currentStudent.email || '';
-  // 讀取已儲存的暱稱
+  document.getElementById('studentProfileError').textContent = '';
+  // 讀取已儲存的個人資料
+  let data = {};
   try {
     const snap = await getDoc(doc(db, 'users', currentStudent.uid));
-    const nickname = snap.exists() ? (snap.data().nickname || '') : '';
-    document.getElementById('studentNicknameInput').value = nickname || currentStudent.displayName || '';
-  } catch(e) {
-    document.getElementById('studentNicknameInput').value = currentStudent.displayName || '';
-  }
+    data = snap.exists() ? snap.data() : {};
+  } catch(e) {}
+  document.getElementById('studentNicknameInput').value = data.nickname || currentStudent.displayName || '';
+  document.getElementById('studentPhoneInput').value = data.phone || '';
+  document.getElementById('studentRealNameInput').value = data.realName || '';
+  document.getElementById('studentEmergencyNameInput').value = data.emergencyName || '';
+  document.getElementById('studentEmergencyPhoneInput').value = data.emergencyPhone || '';
+  // 本名／緊急聯絡人都填過才預設收合；沒填完就展開提醒還沒弄完
+  const moreComplete = !!(data.realName && data.emergencyName && data.emergencyPhone);
+  setProfileMoreCollapsed(moreComplete);
   document.getElementById('studentProfileOverlay').classList.add('open');
 });
 
 document.getElementById('studentProfileSave').addEventListener('click', async () => {
+  const errorEl = document.getElementById('studentProfileError');
+  errorEl.textContent = '';
+
   const nickname = document.getElementById('studentNicknameInput').value.trim();
-  if (!nickname) return;
-  await setDoc(doc(db, 'users', currentStudent.uid), { nickname, email: currentStudent.email }, { merge: true });
+  const phone = document.getElementById('studentPhoneInput').value.trim();
+  const realName = document.getElementById('studentRealNameInput').value.trim();
+  const emergencyName = document.getElementById('studentEmergencyNameInput').value.trim();
+  const emergencyPhone = document.getElementById('studentEmergencyPhoneInput').value.trim();
+
+  // 暱稱／電話／本名／緊急聯絡人姓名＋電話 一律必填；「其他資料」只是收合顯示，不能跳過
+  if (!nickname || !phone || !realName || !emergencyName || !emergencyPhone) {
+    errorEl.textContent = '請完整填寫所有欄位（本名、緊急聯絡人也是必填）';
+    if (!realName || !emergencyName || !emergencyPhone) setProfileMoreCollapsed(false);
+    return;
+  }
+
+  await setDoc(doc(db, 'users', currentStudent.uid), {
+    nickname, phone, realName, emergencyName, emergencyPhone,
+    email: currentStudent.email
+  }, { merge: true });
   updateStudentBtn(nickname);
+  setProfileMoreCollapsed(true);
   document.getElementById('studentProfileOverlay').classList.remove('open');
 });
 
