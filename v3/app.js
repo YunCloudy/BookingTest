@@ -2379,7 +2379,7 @@ function updateTeacherBtn() {
   updateNotifBtn();
 }
 
-document.getElementById('teacherAdminBtn').addEventListener('click', () => {
+document.getElementById('teacherAdminBtn')?.addEventListener('click', () => {
   openAdmin();
 });
 
