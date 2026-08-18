@@ -1399,10 +1399,11 @@ main { padding: 20px 16px 40px; max-width: 680px; margin: 0 auto; }
 /* 購物車：已登入且資料完整時的唯讀個人資料摘要 */
 .cart-profile-summary {
   text-align: left;
-  background: var(--latte-pale, #f5f0ee);
+  border: 1.5px solid var(--rose-light);
   border-radius: 10px;
-  padding: 12px 14px;
+  padding: 10px 12px;
   margin-top: 4px;
+  box-sizing: border-box;
 }
 .cart-profile-summary-header {
   display: flex;

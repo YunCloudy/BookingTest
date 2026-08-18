@@ -2633,13 +2633,18 @@ document.getElementById('studentCreditClose').addEventListener('click', () => {
 });
 
 // 「其他資料」收合區塊：只影響版面顯示，不影響必填驗證
+// 標籤文字每次都重新讀取欄位內容判斷，不管是初次開啟還是手動點箭頭收合，都不會誤判
 function setProfileMoreCollapsed(collapsed) {
   const section = document.getElementById('studentProfileMoreSection');
   const arrow = document.getElementById('studentProfileMoreArrow');
   const label = document.getElementById('studentProfileMoreLabel');
   section.classList.toggle('collapsed', collapsed);
   arrow.textContent = collapsed ? '▸' : '▾';
-  label.textContent = collapsed ? '其他資料 ✓ 已填寫' : '其他資料';
+  const realName = document.getElementById('studentRealNameInput').value.trim();
+  const emergencyName = document.getElementById('studentEmergencyNameInput').value.trim();
+  const emergencyPhone = document.getElementById('studentEmergencyPhoneInput').value.trim();
+  const filled = !!(realName && emergencyName && emergencyPhone);
+  label.textContent = collapsed && filled ? '其他資料 ✓ 已填寫' : '其他資料';
 }
 
 document.getElementById('studentProfileMoreToggle').addEventListener('click', () => {
