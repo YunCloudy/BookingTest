@@ -2071,7 +2071,7 @@ function renderCartOverlay() {
   const itemsEl = document.getElementById('cartItems');
   const checkoutForm = document.getElementById('cartCheckoutForm');
   const quickForm = document.getElementById('cartQuickForm');
-  const summary = document.getElementById('cartProfileSummary');
+  const summary = document.getElementById('cartProfileSummaryWrap');
   const submitBtn = document.getElementById('cartSubmitBtn');
   if (!itemsEl) return;
 

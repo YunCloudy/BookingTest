@@ -1397,6 +1397,11 @@ main { padding: 20px 16px 40px; max-width: 680px; margin: 0 auto; }
 .cart-field-label { text-align: left; font-size: 0.82rem; color: #7a6560; margin-bottom: 4px; margin-top: 10px; }
 
 /* 購物車：已登入且資料完整時的唯讀個人資料摘要 */
+.cart-profile-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
 .cart-profile-summary {
   text-align: left;
   border: 1.5px solid var(--rose-light);
@@ -1404,14 +1409,6 @@ main { padding: 20px 16px 40px; max-width: 680px; margin: 0 auto; }
   padding: 10px 12px;
   margin-top: 4px;
   box-sizing: border-box;
-}
-.cart-profile-summary-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 0.82rem;
-  color: var(--ink-soft);
-  margin-bottom: 6px;
 }
 .cart-edit-link {
   background: none;

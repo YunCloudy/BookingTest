@@ -244,13 +244,15 @@
         <div class="cart-field-label">聯絡電話</div>
         <input type="tel" id="cartPhone" placeholder="輸入電話" maxlength="15">
       </div>
-      <div id="cartProfileSummary" class="cart-profile-summary" style="display:none">
-        <div class="cart-profile-summary-header">
+      <div id="cartProfileSummaryWrap" style="display:none">
+        <div class="cart-field-label cart-profile-label-row">
           <span>個人資料</span>
           <button type="button" id="cartEditProfileLink" class="cart-edit-link">✏️ 編輯</button>
         </div>
-        <div class="cart-profile-summary-row"><span class="cart-summary-key">暱稱</span><span id="cartSummaryNickname"></span></div>
-        <div class="cart-profile-summary-row"><span class="cart-summary-key">聯絡電話</span><span id="cartSummaryPhone"></span></div>
+        <div id="cartProfileSummary" class="cart-profile-summary">
+          <div class="cart-profile-summary-row"><span class="cart-summary-key">暱稱</span><span id="cartSummaryNickname"></span></div>
+          <div class="cart-profile-summary-row"><span class="cart-summary-key">聯絡電話</span><span id="cartSummaryPhone"></span></div>
+        </div>
       </div>
       <div class="cart-field-label">備註（選填）</div>
       <textarea id="cartNote" placeholder="補充說明（例如第一次體驗、特殊需求，限100字）" maxlength="100"></textarea>
