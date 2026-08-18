@@ -1866,6 +1866,44 @@ ${isAdmin() ? renderModalRoster(course) : (hasPendingLeave(course.id) ? `
 }
 
 // ── CART FUNCTIONS ──
+const CART_STORAGE_KEY = 'cart_v1';
+
+// 購物車存到 localStorage（關瀏覽器/重整都還在），送出訂單成功後由 finalizeOrder 清掉
+function saveCartToStorage() {
+  try {
+    localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
+  } catch (e) {
+    console.warn('購物車寫入本地失敗', e);
+  }
+}
+
+// 頁面載入時讀回購物車，並過濾掉已經不存在、額滿、關閉或停課的課程，
+// 避免使用者帶著失效的項目送出訂單
+function loadCartFromStorage() {
+  let saved;
+  try {
+    const raw = localStorage.getItem(CART_STORAGE_KEY);
+    if (!raw) return;
+    saved = JSON.parse(raw);
+    if (!Array.isArray(saved)) return;
+  } catch (e) {
+    console.warn('購物車讀取本地失敗', e);
+    return;
+  }
+
+  cart = saved.filter(item => {
+    const c = courses.find(x => x.id === item.courseId);
+    if (!c) return false;
+    const { state } = courseStatus(c);
+    return state !== 'full' && state !== 'closed' && state !== 'cancelled';
+  });
+
+  if (cart.length !== saved.length) {
+    showToast('購物車中有課程已額滿或關閉，已自動移除');
+  }
+  saveCartToStorage(); // 把過濾後的結果寫回，避免下次又讀到失效項目
+}
+
 function cartHasItem(courseId) {
   return cart.some(item => item.courseId === courseId);
 }
@@ -1881,12 +1919,14 @@ function addToCart(course) {
     return;
   }
   cart.push({ courseId: course.id, dateStr: course.dateStr, date: course.date, time: course.time, title: course.title, price: course.price });
+  saveCartToStorage();
   updateCartBtn();
   showToast(`已加入購物車：${course.title}`);
 }
 
 function removeFromCart(courseId) {
   cart = cart.filter(item => item.courseId !== courseId);
+  saveCartToStorage();
   updateCartBtn();
   renderCartOverlay();
 }
@@ -2315,6 +2355,7 @@ async function finalizeOrder(name, phone, note) {
   // 更新本地 studentOrders（加在最前面，因為是最新的）
   studentOrders.unshift({ id: orderId, ...orderData, teacherId: tid });
   cart = [];
+  saveCartToStorage();
   updateCartBtn();
   btn.textContent = '送出訂單';
   btn.disabled = false;
@@ -2678,6 +2719,14 @@ document.getElementById('studentLogoutConfirm').addEventListener('click', async 
   clearNotifications();
   updateStudentBtn();
   resetGoogleLoginBtn();
+  // 單頁應用（SPA）不會整頁刷新，購物車快速表單的暱稱/電話/備註要手動清掉，
+  // 不然下一個登入的人會看到上一個帳號殘留的舊資料
+  const cartNameEl = document.getElementById('cartName');
+  const cartPhoneEl = document.getElementById('cartPhone');
+  const cartNoteEl = document.getElementById('cartNote');
+  if (cartNameEl) cartNameEl.value = '';
+  if (cartPhoneEl) cartPhoneEl.value = '';
+  if (cartNoteEl) cartNoteEl.value = '';
   document.getElementById('studentLogoutOverlay').classList.remove('open');
   await signOut(auth);
   if (currentView === 'calendar') renderCalendar(); else renderList();
@@ -4386,6 +4435,8 @@ function renderHomeSections() {
   teacherId = TEACHER_ID_STATIC;
   await loadFromStorage();
   teacherId = null; // 撈完還原，等老師登入後才正式設定
+  loadCartFromStorage(); // courses 資料撈完了，這時候讀回購物車才能正確判斷課程是否還有效
+  updateCartBtn();
   renderCalendar();
   renderHomeSections();
 
