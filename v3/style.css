@@ -1554,32 +1554,30 @@ main { padding: 20px 16px 40px; max-width: 680px; margin: 0 auto; }
   white-space: nowrap;
 }
 
-/* ── 學生管理：卡片收合（v3.5） ── */
-.student-card-header {
+/* ── 學生管理：學生資料收合（v3.5，堂數維持一直顯示，只收合本名／電話／緊急聯絡人） ── */
+.student-profile-toggle {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
   cursor: pointer;
+  font-size: 0.82rem;
+  color: var(--rose-dark);
+  padding: 8px 0;
+  margin-top: 10px;
+  border-top: 1px solid var(--rose-light);
 }
-.student-card-summary {
-  font-size: 0.78rem;
-  color: var(--latte-light);
-  flex: 1;
-  text-align: right;
-  margin-right: 4px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.student-profile-arrow { transition: transform 0.15s ease; }
+.student-profile-toggle.open .student-profile-arrow { transform: rotate(180deg); }
+.student-profile-detail { margin-top: 6px; }
+.profile-view-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  color: var(--ink, #4a3a30);
+  padding: 4px 0;
 }
-.student-card-arrow {
-  transition: transform 0.15s ease;
-  color: var(--latte-light);
-  flex-shrink: 0;
-}
-.student-card.open .student-card-arrow { transform: rotate(180deg); }
-.student-card.open .student-card-summary { display: none; }
-.student-card-detail { margin-top: 8px; }
+.profile-view-key { color: var(--latte-light); }
+.profile-view-empty { color: #bbb; }
 
 /* ── 訂單管理 ── */
 .order-header {

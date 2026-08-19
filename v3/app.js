@@ -2562,7 +2562,8 @@ async function openTeacherApply(user) {
   } else {
     formWrap.style.display = 'block';
     statusWrap.style.display = 'none';
-    document.getElementById('applyNameInput').value = '';
+    document.getElementById('applyStudioNameInput').value = '';
+    document.getElementById('applyTeacherNameInput').value = '';
     document.getElementById('applyIgInput').value = '';
     document.getElementById('applyContactValue').value = '';
   }
@@ -2576,20 +2577,21 @@ document.getElementById('teacherApplySubmit').addEventListener('click', async ()
   const user = overlay._applyUser;
   const errorEl = document.getElementById('teacherApplyError');
   const btn = document.getElementById('teacherApplySubmit');
-  const name = document.getElementById('applyNameInput').value.trim();
+  const studioName = document.getElementById('applyStudioNameInput').value.trim();
+  const teacherName2 = document.getElementById('applyTeacherNameInput').value.trim();
   const ig = document.getElementById('applyIgInput').value.trim();
   const contactType = document.getElementById('applyContactType').value;
   const contactValue = document.getElementById('applyContactValue').value.trim();
 
   if (!user) { errorEl.textContent = '登入狀態已失效，請重新登入再申請'; return; }
-  if (!name || !ig || !contactValue) { errorEl.textContent = '請把欄位填完整'; return; }
+  if (!studioName || !teacherName2 || !ig || !contactValue) { errorEl.textContent = '請把欄位填完整'; return; }
 
   errorEl.textContent = '';
   btn.textContent = '送出中…';
   btn.disabled = true;
   try {
     await setDoc(doc(db, 'teacherApplications', user.uid), {
-      name, igHandle: ig, contactType, contactValue,
+      studioName, teacherName: teacherName2, igHandle: ig, contactType, contactValue,
       status: 'pending',
       createdAt: serverTimestamp()
     });
@@ -4331,6 +4333,13 @@ function renderAdmin() {
       const { credits, expireAt } = await getStudentCreditData(tid, s.studentId);
       s.remainingCredits = credits;
       s.creditExpireAt = expireAt; // v3.4：共用到期日
+      // v3.5：一併撈學生資料（本名／電話／緊急聯絡人），來源跟學生端「個人資料」共用同一份 users/{uid}
+      try {
+        const uSnap = await getDoc(doc(db, 'users', s.studentId));
+        s.profile = uSnap.exists() ? uSnap.data() : {};
+      } catch (e) {
+        s.profile = {};
+      }
     }));
 
     studentSection.innerHTML = '';
@@ -4376,56 +4385,60 @@ function renderAdmin() {
           .filter(([, v]) => v);
         const firstPool = allPoolKeys()[0] || '';
         const expiryLine = (poolEntries.length && expireAt) ? `<div class="order-date">使用期限：${expireAt}</div>` : '';
-        // v3.5：卡片預設收合，只留姓名＋堂數摘要，點了才展開詳細清單／手動調整區
-        const summaryText = poolEntries.length
-          ? poolEntries.map(([pk, v]) => `${poolLabel(pk)} ${v}堂`).join('、')
-          : '尚無未用堂數';
+        // v3.5：只有「學生資料」（本名／電話／緊急聯絡人）收合，堂數跟手動調整維持一直顯示
+        const p = s.profile || {};
+        const fld = v => v ? v : '<span class="profile-view-empty">尚未填寫</span>';
         const card = document.createElement('div');
         card.className = 'admin-card student-card';
         card.style.marginBottom = '10px';
         card.innerHTML = `
-          <div class="student-card-header" data-student-id="${s.studentId}">
+          <div class="order-header">
             <div class="order-student-name">${s.studentName}</div>
-            <div class="student-card-summary">${summaryText}</div>
-            <span class="student-card-arrow">▾</span>
+            ${expiryLine}
           </div>
-          <div class="student-card-detail" style="display:none">
-            <div class="order-header">
-              ${expiryLine}
+          <div class="credit-tags" style="margin:6px 0 0">
+            ${poolEntries.length
+              ? poolEntries.map(([pk, v]) => `<span class="credit-tag">${poolLabel(pk)}　剩餘 <b>${v}</b> 堂</span>`).join('')
+              : `<span class="credit-tag credit-tag-empty">尚無未用堂數</span>`}
+          </div>
+          <div class="credit-manual-wrap" data-student-id="${s.studentId}" data-student-name="${s.studentName}">
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <button class="credit-manual-toggle" type="button">✍️手動調整堂數</button>
+              <button class="credit-extend-btn" type="button" data-student-id="${s.studentId}" data-student-name="${s.studentName}">📅延展到期日</button>
+              <button class="credit-zero-btn" type="button" data-student-id="${s.studentId}" data-student-name="${s.studentName}">🧹堂數歸零</button>
             </div>
-            <div class="credit-tags" style="margin:6px 0 0">
-              ${poolEntries.length
-                ? poolEntries.map(([pk, v]) => `<span class="credit-tag">${poolLabel(pk)}　剩餘 <b>${v}</b> 堂</span>`).join('')
-                : `<span class="credit-tag credit-tag-empty">尚無未用堂數</span>`}
+            <div class="credit-manual-form" style="display:none">
+              <select class="credit-manual-pool">
+                ${allPoolKeys().map(pk => `<option value="${pk}" data-current="${credits[pk] || 0}">${poolLabel(pk)}</option>`).join('')}
+              </select>
+              <input class="credit-manual-total" type="number" value="${credits[firstPool] || 0}">
+              <span class="credit-add-unit">堂</span>
+              <button class="credit-manual-apply" type="button">套用</button>
             </div>
-            <div class="credit-manual-wrap" data-student-id="${s.studentId}" data-student-name="${s.studentName}">
-              <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                <button class="credit-manual-toggle" type="button">✍️手動調整堂數</button>
-                <button class="credit-extend-btn" type="button" data-student-id="${s.studentId}" data-student-name="${s.studentName}">📅延展到期日</button>
-                <button class="credit-zero-btn" type="button" data-student-id="${s.studentId}" data-student-name="${s.studentName}">🧹堂數歸零</button>
-              </div>
-              <div class="credit-manual-form" style="display:none">
-                <select class="credit-manual-pool">
-                  ${allPoolKeys().map(pk => `<option value="${pk}" data-current="${credits[pk] || 0}">${poolLabel(pk)}</option>`).join('')}
-                </select>
-                <input class="credit-manual-total" type="number" value="${credits[firstPool] || 0}">
-                <span class="credit-add-unit">堂</span>
-                <button class="credit-manual-apply" type="button">套用</button>
-              </div>
-            </div>
+          </div>
+
+          <div class="student-profile-toggle">
+            <span>👤 學生資料</span>
+            <span class="student-profile-arrow">▾</span>
+          </div>
+          <div class="student-profile-detail" style="display:none">
+            <div class="profile-view-row"><span class="profile-view-key">暱稱</span><span>${fld(p.nickname)}</span></div>
+            <div class="profile-view-row"><span class="profile-view-key">聯絡電話</span><span>${fld(p.phone)}</span></div>
+            <div class="profile-view-row"><span class="profile-view-key">本名</span><span>${fld(p.realName)}</span></div>
+            <div class="profile-view-row"><span class="profile-view-key">緊急聯絡人姓名</span><span>${fld(p.emergencyName)}</span></div>
+            <div class="profile-view-row"><span class="profile-view-key">緊急聯絡人電話</span><span>${fld(p.emergencyPhone)}</span></div>
           </div>
         `;
         listWrap.appendChild(card);
       });
 
-      // v3.5：點卡片標題列收合／展開詳細內容
-      listWrap.querySelectorAll('.student-card-header').forEach(header => {
-        header.addEventListener('click', () => {
-          const card = header.closest('.student-card');
-          const detail = card.querySelector('.student-card-detail');
+      // v3.5：「學生資料」區塊收合／展開（堂數跟手動調整維持一直顯示，不受影響）
+      listWrap.querySelectorAll('.student-profile-toggle').forEach(toggle => {
+        toggle.addEventListener('click', () => {
+          const detail = toggle.nextElementSibling;
           const isOpen = detail.style.display !== 'none';
           detail.style.display = isOpen ? 'none' : 'block';
-          card.classList.toggle('open', !isOpen);
+          toggle.classList.toggle('open', !isOpen);
         });
       });
 
