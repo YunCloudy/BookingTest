@@ -95,6 +95,39 @@
   </div>
 </div>
 
+<!-- TEACHER APPLY OVERLAY（18．教室資料／申請表單） -->
+<div class="login-overlay" id="teacherApplyOverlay">
+  <div class="login-box">
+    <div style="font-size:2rem;margin-bottom:8px">🏠</div>
+    <h3 id="teacherApplyTitle">教室申請</h3>
+
+    <div id="teacherApplyFormWrap">
+      <p style="font-size:0.8rem;color:#7a6560;margin-bottom:12px">這個帳號還沒有老師權限，填寫以下資料送出教室申請</p>
+      <div style="text-align:left;margin-bottom:6px;font-size:0.82rem;color:#7a6560">教室／老師名稱</div>
+      <input type="text" id="applyNameInput" placeholder="輸入教室或老師名稱" maxlength="20" style="margin-bottom:12px">
+      <div style="text-align:left;margin-bottom:6px;font-size:0.82rem;color:#7a6560">IG 帳號</div>
+      <input type="text" id="applyIgInput" placeholder="將預設當網域後綴，可自訂" maxlength="30" style="margin-bottom:12px">
+      <div style="text-align:left;margin-bottom:6px;font-size:0.82rem;color:#7a6560">聯繫方式</div>
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <select id="applyContactType" style="flex:0 0 88px">
+          <option value="line">LINE</option>
+          <option value="mail">Mail</option>
+          <option value="ig">IG</option>
+        </select>
+        <input type="text" id="applyContactValue" placeholder="輸入聯繫帳號／信箱" maxlength="50" style="flex:1">
+      </div>
+      <div class="login-error" id="teacherApplyError"></div>
+      <button class="btn-primary" id="teacherApplySubmit" style="width:100%">送出申請</button>
+    </div>
+
+    <div id="teacherApplyStatusWrap" style="display:none">
+      <p id="teacherApplyStatusText" style="font-size:0.88rem;color:var(--brown-dark);line-height:1.6"></p>
+    </div>
+
+    <button class="login-cancel" id="teacherApplyCancel">關閉</button>
+  </div>
+</div>
+
 <!-- STUDENT LOGIN MODAL -->
 <div class="login-overlay" id="studentLoginOverlay">
   <div class="login-box">

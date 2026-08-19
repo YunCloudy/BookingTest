@@ -2491,10 +2491,11 @@ document.getElementById('teacherGoogleLoginBtn').addEventListener('click', () =>
     if (!user) throw new Error('no user');
     const adminSnap = await getDoc(doc(db, 'admins', user.uid));
     if (!adminSnap.exists()) {
-      await signOut(auth);
-      document.getElementById('loginError').textContent = '此帳號沒有老師權限';
+      // v3.5：不是既有老師 → 帶去教室申請流程（暫時保持登入狀態，關閉／送出後再登出）
+      document.getElementById('loginOverlay').classList.remove('open');
       btn.innerHTML = GOOGLE_BTN_INNER;
       btn.disabled = false;
+      await openTeacherApply(user);
       return;
     }
     if (currentStudent) {
@@ -2528,6 +2529,86 @@ document.getElementById('teacherGoogleLoginBtn').addEventListener('click', () =>
     btn.innerHTML = GOOGLE_BTN_INNER;
     btn.disabled = false;
   });
+});
+
+// ── 教室資料／申請表單（v3.5，第18項）──
+// Google 登入成功但 admins 沒有這個 uid 時導進來：查 teacherApplications/{uid} 目前狀態，
+// 分三種畫面（可申請／審核中／已拒絕），關閉或送出後統一登出（還不是正式老師，不留登入狀態）
+async function openTeacherApply(user) {
+  const overlay = document.getElementById('teacherApplyOverlay');
+  const formWrap = document.getElementById('teacherApplyFormWrap');
+  const statusWrap = document.getElementById('teacherApplyStatusWrap');
+  const statusText = document.getElementById('teacherApplyStatusText');
+  const errorEl = document.getElementById('teacherApplyError');
+  errorEl.textContent = '';
+
+  let appSnap;
+  try {
+    appSnap = await getDoc(doc(db, 'teacherApplications', user.uid));
+  } catch (e) {
+    appSnap = null;
+  }
+
+  if (appSnap && appSnap.exists()) {
+    const status = appSnap.data().status;
+    formWrap.style.display = 'none';
+    statusWrap.style.display = 'block';
+    if (status === 'rejected') {
+      statusText.textContent = '很抱歉，這個帳號的教室申請未通過審核。若有疑問請直接聯繫管理者。';
+    } else {
+      statusText.textContent = '申請已送出，審核中，請耐心等候，核准後會員可以直接用這個帳號登入。';
+    }
+    await signOut(auth);
+  } else {
+    formWrap.style.display = 'block';
+    statusWrap.style.display = 'none';
+    document.getElementById('applyNameInput').value = '';
+    document.getElementById('applyIgInput').value = '';
+    document.getElementById('applyContactValue').value = '';
+  }
+
+  overlay.classList.add('open');
+  overlay._applyUser = user; // 暫存這次流程的登入使用者，送出表單時要用
+}
+
+document.getElementById('teacherApplySubmit').addEventListener('click', async () => {
+  const overlay = document.getElementById('teacherApplyOverlay');
+  const user = overlay._applyUser;
+  const errorEl = document.getElementById('teacherApplyError');
+  const btn = document.getElementById('teacherApplySubmit');
+  const name = document.getElementById('applyNameInput').value.trim();
+  const ig = document.getElementById('applyIgInput').value.trim();
+  const contactType = document.getElementById('applyContactType').value;
+  const contactValue = document.getElementById('applyContactValue').value.trim();
+
+  if (!user) { errorEl.textContent = '登入狀態已失效，請重新登入再申請'; return; }
+  if (!name || !ig || !contactValue) { errorEl.textContent = '請把欄位填完整'; return; }
+
+  errorEl.textContent = '';
+  btn.textContent = '送出中…';
+  btn.disabled = true;
+  try {
+    await setDoc(doc(db, 'teacherApplications', user.uid), {
+      name, igHandle: ig, contactType, contactValue,
+      status: 'pending',
+      createdAt: serverTimestamp()
+    });
+    document.getElementById('teacherApplyFormWrap').style.display = 'none';
+    document.getElementById('teacherApplyStatusWrap').style.display = 'block';
+    document.getElementById('teacherApplyStatusText').textContent = '申請已送出，審核中，請耐心等候，核准後會員可以直接用這個帳號登入。';
+    await signOut(auth);
+  } catch (e) {
+    errorEl.textContent = '送出失敗，請再試一次';
+  }
+  btn.textContent = '送出申請';
+  btn.disabled = false;
+});
+
+document.getElementById('teacherApplyCancel').addEventListener('click', async () => {
+  const overlay = document.getElementById('teacherApplyOverlay');
+  overlay.classList.remove('open');
+  if (auth.currentUser) { try { await signOut(auth); } catch (e) {} }
+  overlay._applyUser = null;
 });
 
 // ── STUDENT LOGIN ──
@@ -4295,37 +4376,57 @@ function renderAdmin() {
           .filter(([, v]) => v);
         const firstPool = allPoolKeys()[0] || '';
         const expiryLine = (poolEntries.length && expireAt) ? `<div class="order-date">使用期限：${expireAt}</div>` : '';
+        // v3.5：卡片預設收合，只留姓名＋堂數摘要，點了才展開詳細清單／手動調整區
+        const summaryText = poolEntries.length
+          ? poolEntries.map(([pk, v]) => `${poolLabel(pk)} ${v}堂`).join('、')
+          : '尚無未用堂數';
         const card = document.createElement('div');
-        card.className = 'admin-card';
+        card.className = 'admin-card student-card';
         card.style.marginBottom = '10px';
         card.innerHTML = `
-          <div class="order-header">
+          <div class="student-card-header" data-student-id="${s.studentId}">
             <div class="order-student-name">${s.studentName}</div>
-            ${expiryLine}
+            <div class="student-card-summary">${summaryText}</div>
+            <span class="student-card-arrow">▾</span>
           </div>
-          <div class="credit-tags" style="margin:6px 0 0">
-            ${poolEntries.length
-              ? poolEntries.map(([pk, v]) => `<span class="credit-tag">${poolLabel(pk)}　剩餘 <b>${v}</b> 堂</span>`).join('')
-              : `<span class="credit-tag credit-tag-empty">尚無未用堂數</span>`}
-          </div>
-          <div class="credit-manual-wrap" data-student-id="${s.studentId}" data-student-name="${s.studentName}">
-            <div style="display:flex; gap:8px; flex-wrap:wrap;">
-              <button class="credit-manual-toggle" type="button">✍️手動調整堂數</button>
-              <button class="credit-extend-btn" type="button" data-student-id="${s.studentId}" data-student-name="${s.studentName}">📅延展到期日</button>
-              <button class="credit-zero-btn" type="button" data-student-id="${s.studentId}" data-student-name="${s.studentName}">🧹堂數歸零</button>
+          <div class="student-card-detail" style="display:none">
+            <div class="order-header">
+              ${expiryLine}
             </div>
-            <div class="credit-manual-form" style="display:none">
-              <select class="credit-manual-pool">
-                ${allPoolKeys().map(pk => `<option value="${pk}" data-current="${credits[pk] || 0}">${poolLabel(pk)}</option>`).join('')}
-              </select>
-              <input class="credit-manual-total" type="number" value="${credits[firstPool] || 0}">
-              <span class="credit-add-unit">堂</span>
-              <button class="credit-manual-apply" type="button">套用</button>
+            <div class="credit-tags" style="margin:6px 0 0">
+              ${poolEntries.length
+                ? poolEntries.map(([pk, v]) => `<span class="credit-tag">${poolLabel(pk)}　剩餘 <b>${v}</b> 堂</span>`).join('')
+                : `<span class="credit-tag credit-tag-empty">尚無未用堂數</span>`}
             </div>
-
+            <div class="credit-manual-wrap" data-student-id="${s.studentId}" data-student-name="${s.studentName}">
+              <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                <button class="credit-manual-toggle" type="button">✍️手動調整堂數</button>
+                <button class="credit-extend-btn" type="button" data-student-id="${s.studentId}" data-student-name="${s.studentName}">📅延展到期日</button>
+                <button class="credit-zero-btn" type="button" data-student-id="${s.studentId}" data-student-name="${s.studentName}">🧹堂數歸零</button>
+              </div>
+              <div class="credit-manual-form" style="display:none">
+                <select class="credit-manual-pool">
+                  ${allPoolKeys().map(pk => `<option value="${pk}" data-current="${credits[pk] || 0}">${poolLabel(pk)}</option>`).join('')}
+                </select>
+                <input class="credit-manual-total" type="number" value="${credits[firstPool] || 0}">
+                <span class="credit-add-unit">堂</span>
+                <button class="credit-manual-apply" type="button">套用</button>
+              </div>
+            </div>
           </div>
         `;
         listWrap.appendChild(card);
+      });
+
+      // v3.5：點卡片標題列收合／展開詳細內容
+      listWrap.querySelectorAll('.student-card-header').forEach(header => {
+        header.addEventListener('click', () => {
+          const card = header.closest('.student-card');
+          const detail = card.querySelector('.student-card-detail');
+          const isOpen = detail.style.display !== 'none';
+          detail.style.display = isOpen ? 'none' : 'block';
+          card.classList.toggle('open', !isOpen);
+        });
       });
 
       // v3.4：手動延展到期日 —— 系統邏輯還沒完全兜起來，或例外狀況要手動修正時用，

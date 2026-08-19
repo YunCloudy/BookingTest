@@ -1554,6 +1554,33 @@ main { padding: 20px 16px 40px; max-width: 680px; margin: 0 auto; }
   white-space: nowrap;
 }
 
+/* ── 學生管理：卡片收合（v3.5） ── */
+.student-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  cursor: pointer;
+}
+.student-card-summary {
+  font-size: 0.78rem;
+  color: var(--latte-light);
+  flex: 1;
+  text-align: right;
+  margin-right: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.student-card-arrow {
+  transition: transform 0.15s ease;
+  color: var(--latte-light);
+  flex-shrink: 0;
+}
+.student-card.open .student-card-arrow { transform: rotate(180deg); }
+.student-card.open .student-card-summary { display: none; }
+.student-card-detail { margin-top: 8px; }
+
 /* ── 訂單管理 ── */
 .order-header {
   display: flex;
