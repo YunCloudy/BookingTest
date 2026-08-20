@@ -2556,15 +2556,16 @@ async function openTeacherApply(user) {
     if (status === 'rejected') {
       statusText.textContent = '很抱歉，這個帳號的教室申請未通過審核。若有疑問請直接聯繫管理者。';
     } else {
-      statusText.textContent = '申請已送出，審核中，請耐心等候，核准後會員可以直接用這個帳號登入。';
+      statusText.textContent = '教室申請已送出，請耐心等候審核，開通後老師就可以直接用這個帳號登入囉';
     }
     await signOut(auth);
   } else {
     formWrap.style.display = 'block';
     statusWrap.style.display = 'none';
-    document.getElementById('applyStudioNameInput').value = '';
     document.getElementById('applyTeacherNameInput').value = '';
+    document.getElementById('applyStudioNameInput').value = '';
     document.getElementById('applyIgInput').value = '';
+    document.getElementById('applySlugInput').value = '';
     document.getElementById('applyContactValue').value = '';
   }
 
@@ -2577,27 +2578,30 @@ document.getElementById('teacherApplySubmit').addEventListener('click', async ()
   const user = overlay._applyUser;
   const errorEl = document.getElementById('teacherApplyError');
   const btn = document.getElementById('teacherApplySubmit');
-  const studioName = document.getElementById('applyStudioNameInput').value.trim();
   const teacherName2 = document.getElementById('applyTeacherNameInput').value.trim();
+  const studioName = document.getElementById('applyStudioNameInput').value.trim();
   const ig = document.getElementById('applyIgInput').value.trim();
+  const slug = document.getElementById('applySlugInput').value.trim() || ig; // 留空預設帶入 IG 帳號
   const contactType = document.getElementById('applyContactType').value;
   const contactValue = document.getElementById('applyContactValue').value.trim();
 
   if (!user) { errorEl.textContent = '登入狀態已失效，請重新登入再申請'; return; }
-  if (!studioName || !teacherName2 || !ig || !contactValue) { errorEl.textContent = '請把欄位填完整'; return; }
+  if (!teacherName2 || !studioName || !ig) { errorEl.textContent = '請把欄位填完整'; return; }
 
   errorEl.textContent = '';
   btn.textContent = '送出中…';
   btn.disabled = true;
   try {
     await setDoc(doc(db, 'teacherApplications', user.uid), {
-      studioName, teacherName: teacherName2, igHandle: ig, contactType, contactValue,
+      teacherName: teacherName2, studioName, igHandle: ig, slug,
+      contactType, contactValue,
+      applicantEmail: user.email || '', // 背景存 Google email，不額外問，方便核對
       status: 'pending',
       createdAt: serverTimestamp()
     });
     document.getElementById('teacherApplyFormWrap').style.display = 'none';
     document.getElementById('teacherApplyStatusWrap').style.display = 'block';
-    document.getElementById('teacherApplyStatusText').textContent = '申請已送出，審核中，請耐心等候，核准後會員可以直接用這個帳號登入。';
+    document.getElementById('teacherApplyStatusText').textContent = '教室申請已送出，請耐心等候審核，開通後老師就可以直接用這個帳號登入囉';
     await signOut(auth);
   } catch (e) {
     errorEl.textContent = '送出失敗，請再試一次';
@@ -2611,6 +2615,78 @@ document.getElementById('teacherApplyCancel').addEventListener('click', async ()
   overlay.classList.remove('open');
   if (auth.currentUser) { try { await signOut(auth); } catch (e) {} }
   overlay._applyUser = null;
+});
+
+// ── 教室資料編輯（老師登入後，下拉選單「🏫 教室資料」）──
+// 老師名稱寫回 admins/{uid}（跟登入歡迎詞綁一起）；教室名稱／IG／網頁ID／聯繫方式寫到 teachers/{teacherId}（整間教室共用）
+// 第一次打開如果 teachers/{teacherId} 還沒有這些欄位，會從 teacherApplications/{uid} 帶入申請時填的資料
+document.getElementById('teacherStudioBtn').addEventListener('click', async () => {
+  document.getElementById('teacherDropdown').classList.remove('open');
+  const overlay = document.getElementById('teacherStudioOverlay');
+  const errorEl = document.getElementById('teacherStudioError');
+  errorEl.textContent = '';
+
+  document.getElementById('studioTeacherNameInput').value = teacherName || '';
+
+  let studioData = {};
+  try {
+    const tSnap = await getDoc(doc(db, 'teachers', teacherId));
+    studioData = tSnap.exists() ? tSnap.data() : {};
+  } catch (e) { studioData = {}; }
+
+  if (!studioData.studioName && currentTeacher) {
+    try {
+      const appSnap = await getDoc(doc(db, 'teacherApplications', currentTeacher.uid));
+      if (appSnap.exists()) {
+        const a = appSnap.data();
+        studioData = { studioName: a.studioName, igHandle: a.igHandle, slug: a.slug, contactType: a.contactType, contactValue: a.contactValue };
+      }
+    } catch (e) {}
+  }
+
+  document.getElementById('studioNameInput').value = studioData.studioName || '';
+  document.getElementById('studioIgInput').value = studioData.igHandle || '';
+  document.getElementById('studioSlugInput').value = studioData.slug || '';
+  document.getElementById('studioContactType').value = studioData.contactType || 'mail';
+  document.getElementById('studioContactValue').value = studioData.contactValue || '';
+
+  overlay.classList.add('open');
+});
+
+document.getElementById('teacherStudioSave').addEventListener('click', async () => {
+  const errorEl = document.getElementById('teacherStudioError');
+  const btn = document.getElementById('teacherStudioSave');
+  const newTeacherName = document.getElementById('studioTeacherNameInput').value.trim();
+  const studioName = document.getElementById('studioNameInput').value.trim();
+  const ig = document.getElementById('studioIgInput').value.trim();
+  const slug = document.getElementById('studioSlugInput').value.trim() || ig;
+  const contactType = document.getElementById('studioContactType').value;
+  const contactValue = document.getElementById('studioContactValue').value.trim();
+
+  if (!newTeacherName || !studioName || !ig) { errorEl.textContent = '請把欄位填完整'; return; }
+  if (!currentTeacher || !teacherId) { errorEl.textContent = '登入狀態已失效，請重新登入'; return; }
+
+  errorEl.textContent = '';
+  btn.textContent = '儲存中…';
+  btn.disabled = true;
+  try {
+    await setDoc(doc(db, 'admins', currentTeacher.uid), { name: newTeacherName }, { merge: true });
+    await setDoc(doc(db, 'teachers', teacherId), {
+      studioName, igHandle: ig, slug, contactType, contactValue
+    }, { merge: true });
+    teacherName = newTeacherName;
+    updateTeacherBtn();
+    document.getElementById('teacherStudioOverlay').classList.remove('open');
+    showToast('教室資料已更新');
+  } catch (e) {
+    errorEl.textContent = '儲存失敗，請再試一次';
+  }
+  btn.textContent = '儲存';
+  btn.disabled = false;
+});
+
+document.getElementById('teacherStudioCancel').addEventListener('click', () => {
+  document.getElementById('teacherStudioOverlay').classList.remove('open');
 });
 
 // ── STUDENT LOGIN ──

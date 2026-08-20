@@ -103,17 +103,27 @@
 
     <div id="teacherApplyFormWrap">
       <p style="font-size:0.8rem;color:#7a6560;margin-bottom:12px">這個帳號還沒有老師權限，填寫以下資料送出教室申請</p>
-      <div style="text-align:left;margin-bottom:6px;font-size:0.82rem;color:#7a6560">教室名稱</div>
-      <input type="text" id="applyStudioNameInput" placeholder="輸入教室名稱" maxlength="20" style="margin-bottom:12px">
       <div style="text-align:left;margin-bottom:6px;font-size:0.82rem;color:#7a6560">老師名稱</div>
-      <input type="text" id="applyTeacherNameInput" placeholder="輸入老師名稱（登入後顯示的稱呼）" maxlength="20" style="margin-bottom:12px">
+      <p style="text-align:left;font-size:0.75rem;color:#aaa;margin:0 0 4px">想讓學生怎麼稱呼你</p>
+      <input type="text" id="applyTeacherNameInput" maxlength="20" style="margin-bottom:12px">
+
+      <div style="text-align:left;margin-bottom:6px;font-size:0.82rem;color:#7a6560">教室名稱</div>
+      <p style="text-align:left;font-size:0.75rem;color:#aaa;margin:0 0 4px">網頁左上角的標題</p>
+      <input type="text" id="applyStudioNameInput" maxlength="20" style="margin-bottom:12px">
+
       <div style="text-align:left;margin-bottom:6px;font-size:0.82rem;color:#7a6560">IG 帳號</div>
-      <input type="text" id="applyIgInput" placeholder="將預設當網域後綴，可自訂" maxlength="30" style="margin-bottom:12px">
-      <div style="text-align:left;margin-bottom:6px;font-size:0.82rem;color:#7a6560">聯繫方式</div>
+      <p style="text-align:left;font-size:0.75rem;color:#aaa;margin:0 0 4px">方便核對是誰申請的</p>
+      <input type="text" id="applyIgInput" maxlength="30" style="margin-bottom:12px">
+
+      <div style="text-align:left;margin-bottom:6px;font-size:0.82rem;color:#7a6560">帳號（網頁ID）</div>
+      <p style="text-align:left;font-size:0.75rem;color:#aaa;margin:0 0 4px">以後網址用，限英數符號，留空預設帶入 IG 帳號</p>
+      <input type="text" id="applySlugInput" maxlength="30" style="margin-bottom:12px">
+
+      <div style="text-align:left;margin-bottom:6px;font-size:0.82rem;color:#7a6560">聯繫方式（選填）</div>
       <div style="display:flex;gap:8px;margin-bottom:12px">
         <select id="applyContactType" style="flex:0 0 88px">
-          <option value="line">LINE</option>
           <option value="mail">Mail</option>
+          <option value="line">LINE</option>
           <option value="ig">IG</option>
         </select>
         <input type="text" id="applyContactValue" placeholder="輸入聯繫帳號／信箱" maxlength="50" style="flex:1">
@@ -154,7 +164,47 @@
 
 <!-- TEACHER DROPDOWN（老師登入後） -->
 <div class="student-dropdown" id="teacherDropdown">
+  <button class="student-dropdown-item" id="teacherStudioBtn">🏫 教室資料</button>
   <button class="student-dropdown-item" id="teacherLogoutBtn">🚪 登出</button>
+</div>
+
+<!-- TEACHER STUDIO PROFILE（教室資料編輯，v3.5） -->
+<div class="login-overlay" id="teacherStudioOverlay">
+  <div class="login-box">
+    <div style="font-size:2rem;margin-bottom:8px">🏫</div>
+    <h3>教室資料</h3>
+
+    <div style="text-align:left;margin-bottom:6px;font-size:0.82rem;color:#7a6560">老師名稱</div>
+    <p style="text-align:left;font-size:0.75rem;color:#aaa;margin:0 0 4px">想讓學生怎麼稱呼你</p>
+    <input type="text" id="studioTeacherNameInput" maxlength="20" style="margin-bottom:12px">
+
+    <div style="text-align:left;margin-bottom:6px;font-size:0.82rem;color:#7a6560">教室名稱</div>
+    <p style="text-align:left;font-size:0.75rem;color:#aaa;margin:0 0 4px">網頁左上角的標題</p>
+    <input type="text" id="studioNameInput" maxlength="20" style="margin-bottom:12px">
+
+    <div style="text-align:left;margin-bottom:6px;font-size:0.82rem;color:#7a6560">IG 帳號</div>
+    <p style="text-align:left;font-size:0.75rem;color:#aaa;margin:0 0 4px">方便核對是誰</p>
+    <input type="text" id="studioIgInput" maxlength="30" style="margin-bottom:12px">
+
+    <div style="text-align:left;margin-bottom:6px;font-size:0.82rem;color:#7a6560">帳號（網頁ID）</div>
+    <p style="text-align:left;font-size:0.75rem;color:#aaa;margin:0 0 4px">以後網址用，限英數符號，留空預設帶入 IG 帳號</p>
+    <input type="text" id="studioSlugInput" maxlength="30" style="margin-bottom:12px">
+
+    <div style="text-align:left;margin-bottom:6px;font-size:0.82rem;color:#7a6560">聯繫方式（選填）</div>
+    <div style="display:flex;gap:8px;margin-bottom:12px">
+      <select id="studioContactType" style="flex:0 0 88px">
+        <option value="mail">Mail</option>
+        <option value="line">LINE</option>
+        <option value="ig">IG</option>
+      </select>
+      <input type="text" id="studioContactValue" placeholder="輸入聯繫帳號／信箱" maxlength="50" style="flex:1">
+    </div>
+
+    <div class="login-error" id="teacherStudioError"></div>
+    <button class="btn-primary" id="teacherStudioSave" style="width:100%">儲存</button>
+    <br>
+    <button class="login-cancel" id="teacherStudioCancel">關閉</button>
+  </div>
 </div>
 
 <!-- TEACHER LOGOUT CONFIRM -->
