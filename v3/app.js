@@ -873,10 +873,17 @@ function renderList() {
   const wrap = document.getElementById('listView');
   wrap.innerHTML = '';
 
-  // v3.4：已結束「月份」自動隱藏（只濾掉整個過去的月份，本月即使已過去幾天也照常顯示）
-  // 只套用在學生視角，老師自己還是要看得到舊課程（管理、複製當範本用）
-  const thisMonthKey = courseMonthKey(new Date().toISOString().slice(0, 10));
-  const visibleCourses = isAdmin() ? courses : courses.filter(c => courseMonthKey(c.dateStr) >= thisMonthKey);
+  // v3.5：已結束「月份」自動隱藏規則更新——
+  //   學生端／老師端單一分類頁籤：只看本月起
+  //   老師端「全部課程」：本月＋上個月（多留一個月方便複製舊課當範本）
+  //   已關閉／已額滿的課程不特別處理，單純跟著月份規則走
+  const now = new Date();
+  const thisMonthKey = courseMonthKey(now.toISOString().slice(0, 10));
+  let lastY = now.getFullYear(), lastM = now.getMonth() - 1;
+  if (lastM < 0) { lastM = 11; lastY -= 1; }
+  const lastMonthKey = `${lastY}-${String(lastM + 1).padStart(2, '0')}`;
+  const monthFloor = (isAdmin() && currentCat === 'all') ? lastMonthKey : thisMonthKey;
+  const visibleCourses = courses.filter(c => courseMonthKey(c.dateStr) >= monthFloor);
 
   function buildCard(c) {
     const { state, remaining } = courseStatus(c);
