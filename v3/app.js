@@ -732,6 +732,9 @@ async function loadFromStorage() {
 let currentCat = 'all';
 let currentCourse = null;
 let currentView = 'calendar';
+// v3.5：批量複製課表
+let batchCopyMode = false;
+const batchCopySelected = new Set();
 const _now = new Date();
 let calYear = _now.getFullYear(), calMonth = _now.getMonth();
 let selectedDay = null;
@@ -885,6 +888,29 @@ function renderList() {
   const monthFloor = (isAdmin() && currentCat === 'all') ? lastMonthKey : thisMonthKey;
   const visibleCourses = courses.filter(c => courseMonthKey(c.dateStr) >= monthFloor);
 
+  // v3.5：批量複製課表工具列（僅老師端）
+  if (isAdmin()) {
+    const toolbar = document.createElement('div');
+    toolbar.className = 'batch-copy-toolbar';
+    toolbar.innerHTML = `
+      <button class="edit-toggle-btn" id="batchCopyToggleBtn">${batchCopyMode ? '✕ 取消批量複製' : '🗂️ 批量複製'}</button>
+    `;
+    wrap.appendChild(toolbar);
+    toolbar.querySelector('#batchCopyToggleBtn').addEventListener('click', () => {
+      batchCopyMode = !batchCopyMode;
+      if (!batchCopyMode) batchCopySelected.clear();
+      renderList();
+    });
+
+    if (batchCopyMode) {
+      const bar = document.createElement('div');
+      bar.className = 'batch-copy-bar';
+      bar.id = 'batchCopyBar';
+      wrap.appendChild(bar);
+      updateBatchCopyBar();
+    }
+  }
+
   function buildCard(c) {
     const { state, remaining } = courseStatus(c);
     const isFull = state === 'full' || state === 'closed' || state === 'cancelled';
@@ -907,12 +933,15 @@ function renderList() {
     const card = document.createElement('div');
     card.className = 'course-card' + (isFull ? ' full' : '');
     card.innerHTML = `
+      ${isAdmin() && batchCopyMode ? `<label class="batch-copy-checkbox-wrap" onclick="event.stopPropagation()">
+        <input type="checkbox" class="batch-copy-checkbox" data-course-id="${c.id}" ${batchCopySelected.has(c.id) ? 'checked' : ''}>
+      </label>` : ''}
       <div class="card-dot ${dotClass}"></div>
       <div class="card-body">
         <div class="card-date">${c.date} ${c.time}</div>
         <div class="card-title">${c.title}</div>
         <div class="card-location">📍 ${c.location}</div>
-        ${isAdmin() ? `<div style="display:flex;gap:6px;margin-top:4px;flex-wrap:wrap">
+        ${isAdmin() && !batchCopyMode ? `<div style="display:flex;gap:6px;margin-top:4px;flex-wrap:wrap">
           <button class="edit-toggle-btn" id="cardEditBtn_${c.id}">✏️ 編輯</button>
           <button class="edit-toggle-btn" id="ccopy_${c.id}">📋 複製</button>
           <button class="edit-toggle-btn" id="cdelete_${c.id}">🗑️ 刪除</button>
@@ -929,11 +958,26 @@ function renderList() {
     `;
     card.addEventListener('click', (e) => {
       if (e.target.closest('.edit-toggle-btn')) return;
+      if (batchCopyMode) {
+        const cb = card.querySelector('.batch-copy-checkbox');
+        if (cb) { cb.checked = !cb.checked; cb.dispatchEvent(new Event('change')); }
+        return;
+      }
       openModal(c);
     });
     wrapper.appendChild(card);
 
-    if (isAdmin()) {
+    if (isAdmin() && batchCopyMode) {
+      const cb = card.querySelector('.batch-copy-checkbox');
+      cb.addEventListener('change', () => {
+        if (cb.checked) batchCopySelected.add(c.id); else batchCopySelected.delete(c.id);
+        card.classList.toggle('batch-copy-selected', cb.checked);
+        updateBatchCopyBar();
+      });
+      card.classList.toggle('batch-copy-selected', batchCopySelected.has(c.id));
+    }
+
+    if (isAdmin() && !batchCopyMode) {
       const bookedList = bookings[c.id];
       const COURSE_CANCEL_REASONS = [
         { code: 'understaffed', label: '人數不足' },
@@ -1294,6 +1338,145 @@ function renderList() {
       });
     });
   }
+}
+
+// ── 批量複製課表（v3.5）──
+function updateBatchCopyBar() {
+  const bar = document.getElementById('batchCopyBar');
+  if (!bar) return;
+  const n = batchCopySelected.size;
+  bar.innerHTML = n > 0
+    ? `<button class="save-announce cei-save-main" id="batchCopyGoBtn">複製已選取的 ${n} 堂</button>`
+    : `<div class="admin-hint">勾選課程卡片左側的框，選好之後這裡會出現複製按鈕</div>`;
+  const goBtn = document.getElementById('batchCopyGoBtn');
+  if (goBtn) goBtn.addEventListener('click', openBatchCopyDateOverlay);
+}
+
+function openBatchCopyDateOverlay() {
+  const selected = courses.filter(c => batchCopySelected.has(c.id));
+  if (!selected.length) return;
+
+  const overlay = document.createElement('div');
+  overlay.className = 'login-overlay open';
+  overlay.id = 'batchCopyDateOverlay';
+  overlay.innerHTML = `
+    <div class="login-box">
+      <div style="font-size:2rem;margin-bottom:8px">🗂️</div>
+      <h3>批量複製課表</h3>
+      <p style="font-size:0.82rem;color:#7a6560;margin-bottom:12px">已選取 ${selected.length} 堂課，選一個新的起始日期，其他堂會依照原本彼此的天數差自動往後排</p>
+      <input type="date" id="batchCopyStartDate" style="margin-bottom:12px">
+      <div class="login-error" id="batchCopyDateError"></div>
+      <button class="btn-primary" id="batchCopyPreviewBtn" style="width:100%">預覽</button>
+      <br>
+      <button class="login-cancel" id="batchCopyDateCancel">取消</button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  document.getElementById('batchCopyDateCancel').addEventListener('click', () => overlay.remove());
+  document.getElementById('batchCopyPreviewBtn').addEventListener('click', () => {
+    const startVal = document.getElementById('batchCopyStartDate').value;
+    if (!startVal) { document.getElementById('batchCopyDateError').textContent = '請選擇新的起始日期'; return; }
+    overlay.remove();
+    openBatchCopyPreview(selected, startVal);
+  });
+}
+
+function openBatchCopyPreview(selected, startVal) {
+  const DOW_CHARS = ['日','一','二','三','四','五','六'];
+  const sorted = [...selected].sort((a, b) => a.dateStr.localeCompare(b.dateStr));
+  const baseOld = new Date(sorted[0].dateStr + 'T00:00:00');
+  const baseNew = new Date(startVal + 'T00:00:00');
+  const todayKey = new Date().toISOString().slice(0, 10);
+
+  // 每堂課依照跟「原本最早那堂」的天數差，套用到新的起始日期上
+  let previewItems = sorted.map(c => {
+    const oldDate = new Date(c.dateStr + 'T00:00:00');
+    const diffDays = Math.round((oldDate - baseOld) / 86400000);
+    const newDate = new Date(baseNew);
+    newDate.setDate(newDate.getDate() + diffDays);
+    const newDateStr = newDate.toISOString().slice(0, 10);
+    const newDateLabel = `${newDate.getMonth() + 1}/${newDate.getDate()}（${DOW_CHARS[newDate.getDay()]}）`;
+    const isPast = newDateStr < todayKey;
+    const isConflict = courses.some(x => x.dateStr === newDateStr && x.time === c.time);
+    return { origId: c.id, orig: c, newDateStr, newDateLabel, isPast, isConflict };
+  });
+
+  renderBatchCopyPreviewOverlay(previewItems);
+}
+
+function renderBatchCopyPreviewOverlay(previewItems) {
+  const existing = document.getElementById('batchCopyPreviewOverlay');
+  if (existing) existing.remove();
+
+  const overlay = document.createElement('div');
+  overlay.className = 'login-overlay open';
+  overlay.id = 'batchCopyPreviewOverlay';
+
+  const rowsHtml = previewItems.map((p, i) => `
+    <div class="batch-preview-row ${p.isPast || p.isConflict ? 'batch-preview-warn' : ''}" data-idx="${i}">
+      <div class="batch-preview-main">
+        <div class="batch-preview-title">${p.orig.title}</div>
+        <div class="batch-preview-sub">${p.newDateLabel} ${p.orig.time}　📍${p.orig.location}</div>
+        ${p.isPast ? `<div class="batch-preview-tag">⚠️ 這個日期已經過去了</div>` : ''}
+        ${p.isConflict ? `<div class="batch-preview-tag">⚠️ 這個時段已經有其他課程</div>` : ''}
+      </div>
+      <button type="button" class="batch-preview-remove" data-idx="${i}">✕</button>
+    </div>
+  `).join('');
+
+  overlay.innerHTML = `
+    <div class="login-box" style="max-height:80vh;overflow-y:auto">
+      <div style="font-size:2rem;margin-bottom:8px">👀</div>
+      <h3>預覽</h3>
+      <p style="font-size:0.82rem;color:#7a6560;margin-bottom:12px">確認沒問題後送出，會一次產生以下課程（人數與名單都是全新的）</p>
+      <div id="batchPreviewList">${rowsHtml}</div>
+      <button class="btn-primary" id="batchCopyConfirmBtn" style="width:100%;margin-top:12px">確認產生（${previewItems.length}）</button>
+      <br>
+      <button class="login-cancel" id="batchCopyPreviewCancel">取消</button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  document.getElementById('batchCopyPreviewCancel').addEventListener('click', () => overlay.remove());
+
+  overlay.querySelectorAll('.batch-preview-remove').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const idx = parseInt(btn.dataset.idx);
+      previewItems.splice(idx, 1);
+      if (!previewItems.length) { overlay.remove(); return; }
+      renderBatchCopyPreviewOverlay(previewItems);
+    });
+  });
+
+  document.getElementById('batchCopyConfirmBtn').addEventListener('click', async () => {
+    const btn = document.getElementById('batchCopyConfirmBtn');
+    btn.disabled = true;
+    btn.textContent = '產生中…';
+    previewItems.forEach((p, i) => {
+      const newId = Date.now() + i;
+      const newCourse = {
+        ...p.orig,
+        id: newId,
+        dateStr: p.newDateStr,
+        date: p.newDateLabel,
+        open: true,
+        cancelled: false,
+        cancelReason: '',
+        cancelReasonText: '',
+        announceSmall: '',
+        showRoster: false,
+      };
+      courses.push(newCourse);
+      bookings[newId] = [];
+    });
+    await saveToStorage();
+    overlay.remove();
+    batchCopyMode = false;
+    batchCopySelected.clear();
+    if (currentView === 'calendar') renderCalendar(); else renderList();
+    showToast(`已產生 ${previewItems.length} 堂新課程`);
+  });
 }
 
 // ── CALENDAR ──

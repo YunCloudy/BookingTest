@@ -289,6 +289,48 @@ main { padding: 20px 16px 40px; max-width: 680px; margin: 0 auto; }
 }
 .course-card.full:hover { transform: none; box-shadow: var(--shadow); }
 
+/* ── 批量複製課表（v3.5） ── */
+.batch-copy-toolbar { margin-bottom: 10px; }
+.batch-copy-bar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  margin-bottom: 10px;
+}
+.batch-copy-checkbox-wrap {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+.batch-copy-checkbox { width: 20px; height: 20px; accent-color: var(--rose); cursor: pointer; }
+.course-card.batch-copy-selected { border-color: var(--rose); background: var(--rose-light); }
+
+.batch-preview-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--rose-light);
+  text-align: left;
+}
+.batch-preview-row:last-child { border-bottom: none; }
+.batch-preview-warn { background: #fff6e8; border-radius: 8px; padding: 10px 8px; }
+.batch-preview-main { flex: 1; }
+.batch-preview-title { font-weight: 600; font-size: 0.9rem; color: var(--ink); }
+.batch-preview-sub { font-size: 0.78rem; color: var(--ink-soft); margin-top: 2px; }
+.batch-preview-tag { font-size: 0.75rem; color: #b8860b; margin-top: 3px; }
+.batch-preview-remove {
+  background: none;
+  border: none;
+  color: #aaa;
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 2px 6px;
+  flex-shrink: 0;
+}
+.batch-preview-remove:hover { color: var(--rose-dark); }
+
 .card-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
 .dot-available { background: var(--rose); }
 .dot-full { background: #ccc; }
