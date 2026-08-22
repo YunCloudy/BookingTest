@@ -79,28 +79,28 @@ const categories = [
     id: 'aerial',
     label: '空中瑜珈',
     subcats: ['常態團課', '許願加開'],
-    announceMid: ''
+    announceMid: '這裡可以寫課程近期的注意事項，例如方案調整、特殊優惠等'
   },
   {
     id: 'pilates',
     label: '皮拉提斯',
     subcats: ['器械皮拉提斯', '墊上皮拉提斯'],
-    announceMid: '因教室租借費用調漲，費用有調整喔🙏'
+    announceMid: '這裡可以寫課程近期的注意事項，例如方案調整、特殊優惠等'
   },
  {
     id: 'circus',
     label: '旋轉課',
     subcats: ['空環', '舞綢'],
-    announceMid: ''
+    announceMid: '這裡可以寫課程近期的注意事項，例如方案調整、特殊優惠等'
   },
 ];
 
 // 首頁區塊
 const homeSections = {
-  notice:      { id: 'noticeRules',        icon: '📋', title: '上課注意事項', text: `• 直接私訊報名，先報名先保留名額（記得設鬧鐘哦）\n• 器械皮拉提斯一對一課程開放預約，有需要包班上課或有許願上課時間要趕快跟我說喔！避免租不到教室\n• 3、4月購買的空瑜課程期限到5月底喔！記得約課使用～\n• 因手機容量不足，請於5/21前下載上課的照片，5/22會清理相簿` },
-  about:       { id: 'sectionAbout',       icon: '✨', title: '關於課程',     text: '✔️課程紮實有趣\n暖身、課程主題、放鬆循序完成，會鼓勵你盡力完成，完成成果會幫你拍照記錄，你也可以自行錄影\n(看著自己一次次進步會很有成就感)\n✔️訓練肌力、培養固定運動習慣\n藉由空中掛布體驗在空中飛翔的趣味，在一次次的課程中訓練肌力、養成運動的好習慣\n(找到有興趣可以持續的運動，也許空瑜就是你有興趣的運動)\n✔️安全第一\n我會確保你在安全的狀態下做動作，你也需評估自身身體狀況、專心上課保護自己哦' },
-  booking:     { id: 'sectionBooking',     icon: '📣', title: '報名說明',     text: '*舊生請私訊報名，新生請填寫此報名表\n*若有其他許願的需求時間，或是朋友想揪團包班上課，可私訊詢問。' },
-  courseIntro: { id: 'sectionCourseIntro', icon: '🧘', title: '其他注意事項', text: '' },
+  notice:      { id: 'noticeRules',        icon: '📋', title: '上課注意事項', text: '這裡可以寫報名方式、特殊課程規則、堂數期限提醒、其他你想讓學生知道的事項等等' },
+  about:       { id: 'sectionAbout',       icon: '✨', title: '關於課程',     text: '這裡可以簡述課程特色、希望能帶給學生的效果/收獲、或其他你在意的重點等等' },
+  booking:     { id: 'sectionBooking',     icon: '📣', title: '報名說明',     text: '這裡可以寫報名管道（例如私訊、線上表單）、新舊生報名方式的差異、揪團／包班等特殊需求說明' },
+  courseIntro: { id: 'sectionCourseIntro', icon: '🧘', title: '其他注意事項', text: '註記：所有欄位都可以自由利用，非硬性限定，若有其他希望增加的重點欄位建議，都歡迎聯繫開發者☺️' },
 };
 
 // 小公告：每堂課自己的備註（announceSmall）
@@ -3005,8 +3005,8 @@ function renderAdmin() {
     bigCard.innerHTML = `
       <div class="admin-hint">顯示在首頁最上方，標題與內容皆留空則不顯示</div>
       <div class="admin-announce">
-        <input type="text" id="bigAnnounceTitle" class="admin-announce-title-input" placeholder="請輸入公告標題" value="${localStorage.getItem('globalNoticeTitle') || document.getElementById('globalNoticeTitle')?.innerText || ''}">
-        <textarea id="bigAnnounce" placeholder="請輸入公告內容">${localStorage.getItem('globalNoticeBody') || document.getElementById('globalNoticeBody')?.innerText || ''}</textarea>
+        <input type="text" id="bigAnnounceTitle" class="admin-announce-title-input" placeholder="全域公告" value="${localStorage.getItem('globalNoticeTitle') || document.getElementById('globalNoticeTitle')?.innerText || ''}">
+        <textarea id="bigAnnounce" placeholder="這裡可以寫報名開放時間、活動資訊等">${localStorage.getItem('globalNoticeBody') || document.getElementById('globalNoticeBody')?.innerText || ''}</textarea>
         <button class="save-announce" id="saveBigAnn">儲存</button>
       </div>
     `;
