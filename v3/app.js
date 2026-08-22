@@ -90,7 +90,7 @@ const categories = [
  {
     id: 'circus',
     label: '旋轉課',
-    subcats: ['空環', '舞綢'],
+    subcats: ['空中環', '空中舞綢'],
     announceMid: '這裡可以寫課程近期的注意事項，例如方案調整、特殊優惠等'
   },
 ];
@@ -99,147 +99,95 @@ const categories = [
 const homeSections = {
   notice:      { id: 'noticeRules',        icon: '📋', title: '上課注意事項', text: '這裡可以寫報名方式、特殊課程規則、堂數期限提醒、其他你想讓學生知道的事項等等' },
   about:       { id: 'sectionAbout',       icon: '✨', title: '關於課程',     text: '這裡可以簡述課程特色、希望能帶給學生的效果/收獲、或其他你在意的重點等等' },
-  booking:     { id: 'sectionBooking',     icon: '📣', title: '報名說明',     text: '這裡可以寫報名管道（例如私訊、線上表單）、新舊生報名方式的差異、揪團／包班等特殊需求說明' },
+  booking:     { id: 'sectionBooking',     icon: '📣', title: '報名說明',     text: '這裡可以寫報名管道（例如私訊、線上表單）、揪團、包班等特殊需求說明' },
   courseIntro: { id: 'sectionCourseIntro', icon: '🧘', title: '其他注意事項', text: '註記：所有欄位都可以自由利用，非硬性限定，若有其他希望增加的重點欄位建議，都歡迎聯繫開發者☺️' },
 };
 
 // 小公告：每堂課自己的備註（announceSmall）
 // → 顯示在課程 modal 的「課程備註」區塊
 // → 管理員可在課程卡的編輯區塊單獨儲存，不影響其他課程資料
+// v3.5：以下為展示用種子資料（僅在 Firestore 尚無任何課程時作為初始值），
+// 涵蓋 開放中／已額滿／待開班／已關閉 四種狀態，地點與人名皆為虛構
 let courses = [
   {
     id: 1, cat: 'aerial', subcat: '常態團課',
-    dateStr: '2026-05-20', date: '5/20（三）', time: '18:10~19:10',
-    title: '常態空瑜',
-    location: '松江南京', locationDetail: '捷運松江南京站',
+    dateStr: '2026-08-25', date: '8/25（二）', time: '19:00~20:00',
+    title: '空中瑜珈基礎班',
+    location: '陽光教室', locationDetail: '報名後提供詳細地址',
     price: 500, minSpots: 3, maxSpots: 5, open: true,
     desc: '',
     announceSmall: '', showRoster: false
   },
   {
     id: 2, cat: 'aerial', subcat: '常態團課',
-    dateStr: '2026-05-20', date: '5/20（三）', time: '19:20~20:20',
-    title: '中階空瑜',
-    location: '松江南京', locationDetail: '捷運松江南京站',
-    price: 500, minSpots: 3, maxSpots: 5, open: true,
-    desc: '＊中階空瑜適合已熟悉基礎倒掛、截肢腳，練習至少10堂以上的同學',
-    announceSmall: '', showRoster: false
+    dateStr: '2026-08-25', date: '8/25（二）', time: '20:10~21:10',
+    title: '空中瑜珈中階班',
+    location: '陽光教室', locationDetail: '報名後提供詳細地址',
+    price: 500, minSpots: 3, maxSpots: 3, open: true,
+    desc: '',
+    announceSmall: '', showRoster: true
   },
   {
     id: 3, cat: 'aerial', subcat: '常態團課',
-    dateStr: '2026-05-20', date: '5/20（三）', time: '20:30~21:30',
-    title: '新手特別友善班',
-    location: '松江南京', locationDetail: '捷運松江南京站',
+    dateStr: '2026-08-26', date: '8/26（三）', time: '19:00~20:00',
+    title: '空中瑜珈低空療癒班',
+    location: '陽光教室', locationDetail: '報名後提供詳細地址',
     price: 500, minSpots: 3, maxSpots: 5, open: true,
-    desc: '＊新手一定只能報名新手特別友善班嗎？\n沒有喔！因為是自己開班、我更能掌握各個學員的學習狀況，我會視該堂報名學員狀況編排適合的課程。\n但對新手來說、跟同程度的同學一起上課比較不緊張、比較放鬆無壓力，在基礎技巧上我可以花更多時間講解，因此特別開設新手友善班。',
+    desc: '',
     announceSmall: '', showRoster: false
   },
   {
-    id: 4, cat: 'pilates', subcat: '器械皮拉提斯',
-    dateStr: '2026-05-21', date: '5/21（四）', time: '18:20~19:20',
-    title: '市政府器械皮拉提斯團課',
-    location: '市政府', locationDetail: '捷運市政府站',
-    price: 800, minSpots: 2, maxSpots: 3, open: false,
-    desc: '細節講好講滿、確保你使用正確方式訓練\n讓大家用划算的價格持續讓身體進步',
+    id: 4, cat: 'aerial', subcat: '許願加開',
+    dateStr: '2026-08-27', date: '8/27（四）', time: '19:30~20:30',
+    title: '限定高空教室',
+    location: '微風高空教室', locationDetail: '報名後提供詳細地址',
+    price: 600, minSpots: 3, maxSpots: 6, open: true,
+    desc: '應學員需求特別加開的高空教室體驗',
     announceSmall: '', showRoster: false
   },
   {
     id: 5, cat: 'pilates', subcat: '器械皮拉提斯',
-    dateStr: '2026-05-21', date: '5/21（四）', time: '19:30~20:30',
-    title: '市政府器械皮拉提斯團課',
-    location: '市政府', locationDetail: '捷運市政府站',
-    price: 800, minSpots: 2, maxSpots: 3, open: false,
-    desc: '細節講好講滿、確保你使用正確方式訓練\n讓大家用划算的價格持續讓身體進步',
+    dateStr: '2026-08-26', date: '8/26（三）', time: '18:30~19:30',
+    title: '器械皮拉提斯團課',
+    location: '河岸教室', locationDetail: '報名後提供詳細地址',
+    price: 600, minSpots: 2, maxSpots: 4, open: true,
+    desc: '',
     announceSmall: '', showRoster: false
   },
   {
     id: 6, cat: 'pilates', subcat: '器械皮拉提斯',
-    dateStr: '2026-05-21', date: '5/21（四）', time: '20:40~21:40',
-    title: '市政府器械皮拉提斯團課',
-    location: '市政府', locationDetail: '捷運市政府站',
-    price: 800, minSpots: 2, maxSpots: 3, open: false,
-    desc: '細節講好講滿、確保你使用正確方式訓練\n讓大家用划算的價格持續讓身體進步',
+    dateStr: '2026-08-28', date: '8/28（五）', time: '18:30~19:30',
+    title: '器械皮拉提斯團課',
+    location: '海岸教室', locationDetail: '報名後提供詳細地址',
+    price: 600, minSpots: 2, maxSpots: 4, open: false,
+    desc: '',
     announceSmall: '', showRoster: false
   },
   {
-    id: 7, cat: 'pilates', subcat: '器械皮拉提斯',
-    dateStr: '2026-05-22', date: '5/22（五）', time: '18:30~19:30',
-    title: '小巨蛋器械皮拉提斯團課',
-    location: '小巨蛋', locationDetail: '捷運小巨蛋站5號出口3分鐘',
-    price: 800, minSpots: 2, maxSpots: 4, open: false,
-    desc: '細節講好講滿、確保你使用正確方式訓練\n讓大家用划算的價格持續讓身體進步',
-    announceSmall: '', showRoster: false
-  },
-  {
-    id: 8, cat: 'aerial', subcat: '常態團課',
-    dateStr: '2026-05-23', date: '5/23（六）', time: '11:00~12:00',
-    title: '常態空瑜',
-    location: '松江南京', locationDetail: '捷運松江南京站',
+    id: 7, cat: 'pilates', subcat: '墊上皮拉提斯',
+    dateStr: '2026-08-27', date: '8/27（四）', time: '20:00~21:00',
+    title: '墊上皮拉提斯團課',
+    location: '河岸教室', locationDetail: '報名後提供詳細地址',
     price: 500, minSpots: 3, maxSpots: 6, open: true,
     desc: '',
     announceSmall: '', showRoster: false
   },
   {
-    id: 9, cat: 'pilates', subcat: '墊上皮拉提斯',
-    dateStr: '2026-05-23', date: '5/23（六）', time: '12:15~13:15',
-    title: '墊上皮拉提斯',
-    location: '松江南京', locationDetail: '捷運松江南京站',
-    price: 500, minSpots: 3, maxSpots: 6, open: true,
-    desc: '【5月主題:核心改善圓肩駝背】\n✔透過皮拉提斯式呼吸,釋放肩頸緊繃、穩定脊椎\n✔核心深層肌群的啟動與鍛鍊,減輕腰痛、下背負擔\n✔背部與肩胛肌群訓練,找回肩胛骨中立位,改善上半身體態',
-    announceSmall: '', showRoster: false
-  },
-  {
-    id: 10, cat: 'aerial', subcat: '許願加開',
-    dateStr: '2026-05-24', date: '5/24（日）', time: '11:30~12:30',
-    title: '低空療癒伸展課程',
-    location: '松江南京', locationDetail: '捷運松江南京站',
-    price: 600, minSpots: 3, maxSpots: 7, open: true,
+    id: 8, cat: 'circus', subcat: '空中環',
+    dateStr: '2026-08-29', date: '8/29（六）', time: '10:00~11:00',
+    title: '空中環展示課',
+    location: '星光教室', locationDetail: '報名後提供詳細地址',
+    price: 550, minSpots: 3, maxSpots: 6, open: true,
     desc: '',
     announceSmall: '', showRoster: false
   },
   {
-    id: 11, cat: 'aerial', subcat: '許願加開',
-    dateStr: '2026-05-24', date: '5/24（日）', time: '13:00~14:00',
-    title: '民權西路站漂亮高空教室',
-    location: '民權西路', locationDetail: '捷運民權西路站',
-    price: 600, minSpots: 4, maxSpots: 7, open: true,
-    desc: '民權西路站漂亮高空教室因租借費用較貴+掛布清潔費，課費為600元/堂',
-    announceSmall: '', showRoster: false
-  },
-  {
-    id: 12, cat: 'aerial', subcat: '常態團課',
-    dateStr: '2026-05-25', date: '5/25（一）', time: '19:10~20:10',
-    title: '常態空瑜',
-    location: '松江南京', locationDetail: '捷運松江南京站',
-    price: 500, minSpots: 3, maxSpots: 5, open: true,
+    id: 9, cat: 'circus', subcat: '空中舞綢',
+    dateStr: '2026-08-29', date: '8/29（六）', time: '11:15~12:15',
+    title: '空中舞綢展示課',
+    location: '星光教室', locationDetail: '報名後提供詳細地址',
+    price: 550, minSpots: 3, maxSpots: 6, open: true,
     desc: '',
-    announceSmall: '', showRoster: false
-  },
-  {
-    id: 13, cat: 'aerial', subcat: '常態團課',
-    dateStr: '2026-05-25', date: '5/25（一）', time: '20:20~21:20',
-    title: '常態空瑜',
-    location: '松江南京', locationDetail: '捷運松江南京站',
-    price: 500, minSpots: 3, maxSpots: 5, open: true,
-    desc: '',
-    announceSmall: '', showRoster: false
-  },
-  {
-    id: 14, cat: 'aerial', subcat: '常態團課',
-    dateStr: '2026-05-26', date: '5/26（二）', time: '19:30~20:30',
-    title: '常態空瑜',
-    location: '松江南京', locationDetail: '捷運松江南京站',
-    price: 500, minSpots: 3, maxSpots: 5, open: true,
-    desc: '',
-    announceSmall: '', showRoster: false
-  },
-  {
-    id: 15, cat: 'pilates', subcat: '墊上皮拉提斯',
-    dateStr: '2026-05-26', date: '5/26（二）', time: '19:40~20:40',
-    title: '墊上皮拉提斯',
-    location: '松江南京', locationDetail: '捷運松江南京站',
-    price: 500, minSpots: 3, maxSpots: 6, open: true,
-    desc: '【5月主題:核心改善圓肩駝背】\n✔透過皮拉提斯式呼吸,釋放肩頸緊繃、穩定脊椎\n✔核心深層肌群的啟動與鍛鍊,減輕腰痛、下背負擔\n✔背部與肩胛肌群訓練,找回肩胛骨中立位,改善上半身體態',
     announceSmall: '', showRoster: false
   },
 ];
@@ -249,6 +197,15 @@ let courses = [
 // 初始化時以課程 id 為 key，預設空陣列
 const bookings = {};
 courses.forEach(c => bookings[c.id] = []);
+// v3.5：展示用示範報名名單——課程2（已額滿）、課程3（待開班）各補幾筆假資料，方便展示 showRoster 開關的差異
+bookings[2] = [
+  { name: '示範學員A', time: '2026-08-20T10:00:00' },
+  { name: '示範學員B', time: '2026-08-20T10:05:00' },
+  { name: '示範學員C', time: '2026-08-20T10:10:00' }
+];
+bookings[3] = [
+  { name: '示範學員A', time: '2026-08-20T10:00:00' }
+];
 
 // ── FIRESTORE ──
 
