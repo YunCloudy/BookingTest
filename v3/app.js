@@ -111,11 +111,11 @@ const homeSections = {
 let courses = [
   {
     id: 1, cat: 'aerial', subcat: '常態團課',
-    dateStr: '2026-08-25', date: '8/25（二）', time: '19:00~20:00',
+    dateStr: '2026-07-25', date: '7/25（六）', time: '19:00~20:00',
     title: '空中瑜珈基礎班',
     location: '陽光教室', locationDetail: '報名後提供詳細地址',
     price: 500, minSpots: 3, maxSpots: 5, open: true,
-    desc: '',
+    desc: '「全部課程」頁籤會多留一個月的舊課程，方便複製舊課當範本使用☺️',
     announceSmall: '', showRoster: false
   },
   {
