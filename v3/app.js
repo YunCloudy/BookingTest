@@ -2569,6 +2569,56 @@ document.getElementById('overlay').addEventListener('click', e => {
   if (e.target === document.getElementById('overlay')) closeModal();
 });
 
+// ── MODAL 下拉關閉手勢（拖曳把手往下滑就關閉，保留原本 X／背景點擊當備用方式）──
+(function initModalDragToClose() {
+  const modal = document.getElementById('modal');
+  const handle = modal.querySelector('.modal-handle');
+  if (!handle) return;
+
+  let dragging = false;
+  let startY = 0;
+  let currentDelta = 0;
+  let startTime = 0;
+
+  function onTouchStart(e) {
+    dragging = true;
+    startY = e.touches[0].clientY;
+    startTime = Date.now();
+    currentDelta = 0;
+    modal.classList.add('dragging');
+  }
+
+  function onTouchMove(e) {
+    if (!dragging) return;
+    const delta = e.touches[0].clientY - startY;
+    if (delta <= 0) return; // 只允許往下拖，往上不動作
+    currentDelta = delta;
+    modal.style.transform = `translateY(${delta}px)`;
+    e.preventDefault();
+  }
+
+  function onTouchEnd() {
+    if (!dragging) return;
+    dragging = false;
+    modal.classList.remove('dragging');
+
+    const elapsed = Date.now() - startTime;
+    const velocity = elapsed > 0 ? currentDelta / elapsed : 0; // px/ms
+    const threshold = modal.offsetHeight * 0.25;
+
+    if (currentDelta > threshold || velocity > 0.5) {
+      closeModal();
+    }
+    modal.style.transform = '';
+    currentDelta = 0;
+  }
+
+  handle.addEventListener('touchstart', onTouchStart, { passive: true });
+  handle.addEventListener('touchmove', onTouchMove, { passive: false });
+  handle.addEventListener('touchend', onTouchEnd);
+  handle.addEventListener('touchcancel', onTouchEnd);
+})();
+
 // ── TOAST ──
 function showToast(msg) {
   const t = document.getElementById('toastNotice');

@@ -382,6 +382,17 @@ main { padding: 20px 16px 40px; max-width: 680px; margin: 0 auto; }
   background: #ddd;
   border-radius: 2px;
   margin: 0 auto 20px;
+  position: relative;
+  touch-action: none;
+}
+.modal-handle::before {
+  /* 擴大實際可觸控/拖曳的範圍，視覺上還是只看到那條細橫桿 */
+  content: '';
+  position: absolute;
+  top: -16px; left: -40px; right: -40px; bottom: -16px;
+}
+.modal.dragging {
+  transition: none !important;
 }
 .modal-tag {
   display: inline-block;
