@@ -1567,6 +1567,19 @@ main { padding: 20px 16px 40px; max-width: 680px; margin: 0 auto; }
   color: var(--ink-soft);
   opacity: 0.8;
 }
+.notif-clear-btn {
+  display: block;
+  width: 100%;
+  padding: 10px 16px;
+  background: none;
+  border: none;
+  border-top: 1px solid var(--rose-light);
+  color: var(--ink-soft);
+  font-size: 0.78rem;
+  text-align: center;
+  cursor: pointer;
+}
+.notif-clear-btn:hover { color: var(--rose-dark); background: var(--rose-light); }
 
 /* ── CART NOTE ── */
 #cartNote {

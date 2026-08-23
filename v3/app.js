@@ -732,7 +732,7 @@ async function loadFromStorage() {
 let currentCat = 'all';
 let currentCourse = null;
 let currentView = 'calendar';
-// v3.5：批量複製課表
+// v3.5：批次複製課表
 let batchCopyMode = false;
 const batchCopySelected = new Set();
 const _now = new Date();
@@ -888,12 +888,12 @@ function renderList() {
   const monthFloor = (isAdmin() && currentCat === 'all') ? lastMonthKey : thisMonthKey;
   const visibleCourses = courses.filter(c => courseMonthKey(c.dateStr) >= monthFloor);
 
-  // v3.5：批量複製課表工具列（僅老師端）
+  // v3.5：批次複製課表工具列（僅老師端）
   if (isAdmin()) {
     const toolbar = document.createElement('div');
     toolbar.className = 'batch-copy-toolbar';
     toolbar.innerHTML = `
-      <button class="edit-toggle-btn" id="batchCopyToggleBtn">${batchCopyMode ? '✕ 取消批量複製' : '🗂️ 批量複製'}</button>
+      <button class="edit-toggle-btn" id="batchCopyToggleBtn">${batchCopyMode ? '✕ 取消批次複製' : '🗂️ 批次複製'}</button>
     `;
     wrap.appendChild(toolbar);
     toolbar.querySelector('#batchCopyToggleBtn').addEventListener('click', () => {
@@ -1340,7 +1340,7 @@ function renderList() {
   }
 }
 
-// ── 批量複製課表（v3.5）──
+// ── 批次複製課表（v3.5）──
 function updateBatchCopyBar() {
   const bar = document.getElementById('batchCopyBar');
   if (!bar) return;
@@ -1362,7 +1362,7 @@ function openBatchCopyDateOverlay() {
   overlay.innerHTML = `
     <div class="login-box">
       <div style="font-size:2rem;margin-bottom:8px">🗂️</div>
-      <h3>批量複製課表</h3>
+      <h3>批次複製課表</h3>
       <p style="font-size:0.82rem;color:#7a6560;margin-bottom:12px">已選取 ${selected.length} 堂課，選一個新的起始日期，其他堂會依照原本彼此的天數差自動往後排</p>
       <input type="date" id="batchCopyStartDate" style="margin-bottom:12px">
       <div class="login-error" id="batchCopyDateError"></div>
@@ -2361,8 +2361,10 @@ function formatNotifTime(ts) {
 function renderNotifDropdown() {
   const list = document.getElementById('notifList');
   if (!list) return;
+  const clearBtn = document.getElementById('notifClearBtn');
   if (notifItems.length === 0) {
     list.innerHTML = '<div class="notif-empty">目前沒有通知</div>';
+    if (clearBtn) clearBtn.style.display = 'none';
     return;
   }
   list.innerHTML = notifItems.map(n => `
@@ -2372,7 +2374,32 @@ function renderNotifDropdown() {
       <div class="notif-item-time">${formatNotifTime(n.createdAt)}</div>
     </div>
   `).join('');
+  if (clearBtn) clearBtn.style.display = '';
 }
+
+// v3.5：清除通知——老師/學生各自只清自己的，通知面板是共用元件，靠 notifPathType/notifOwnerId 自動對應目前登入身分
+async function clearAllNotifs() {
+  if (!notifPathType || !notifOwnerId || notifItems.length === 0) return;
+  if (!confirm('確定要清除全部通知嗎？清除後無法復原。')) return;
+  const toDelete = [...notifItems];
+  notifItems = [];
+  renderNotifDropdown();
+  updateNotifBadge();
+  try {
+    const batch = writeBatch(db);
+    toDelete.forEach(n => {
+      batch.delete(doc(db, notifPathType, notifOwnerId, 'notifications', n.id));
+    });
+    await batch.commit();
+  } catch (e) {
+    console.warn('清除通知失敗', e);
+  }
+}
+
+document.getElementById('notifClearBtn').addEventListener('click', (e) => {
+  e.stopPropagation();
+  clearAllNotifs();
+});
 
 async function markAllNotifsRead() {
   const unread = notifItems.filter(n => !n.read);
