@@ -2126,6 +2126,62 @@ function hasApprovedDeductLeave(courseId) {
   return !!b && !!b.onLeave;
 }
 
+// 學生端：「📅 已報名課程」清單（16-2，新增功能）
+// 資料完全複用現有的 courses + bookings（isEnrolled 判斷），不另外查 Firestore、不動任何現有邏輯
+// 呈現規則：未來（含今天）的課依日期時間排序、預設展開；已結束的課摺疊在下方，點開才看得到
+function renderStudentEnrolledList() {
+  const wrap = document.getElementById('studentEnrolledList');
+  if (!wrap || !currentStudent) return;
+
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const enrolled = courses.filter(c => isEnrolled(c.id));
+  const upcoming = enrolled.filter(c => c.dateStr >= todayStr)
+    .sort((a, b) => (a.dateStr + a.time).localeCompare(b.dateStr + b.time));
+  const past = enrolled.filter(c => c.dateStr < todayStr)
+    .sort((a, b) => (b.dateStr + b.time).localeCompare(a.dateStr + a.time));
+
+  if (enrolled.length === 0) {
+    wrap.innerHTML = '<div class="student-credit-empty">目前沒有已報名的課程</div>';
+    return;
+  }
+
+  const rowHtml = (c) => `
+    <div class="cart-item">
+      <div class="cart-item-info">
+        <div class="cart-item-title">${c.title}</div>
+        <div class="cart-item-meta">${c.date} ${c.time}　📍 ${c.location}</div>
+      </div>
+    </div>`;
+
+  const upcomingHtml = upcoming.length
+    ? upcoming.map(rowHtml).join('')
+    : '<div class="student-credit-empty">目前沒有即將上課的課程</div>';
+
+  const pastHtml = past.length
+    ? `<div id="studentEnrolledPastToggle" class="profile-more-toggle">
+         <span>已結束的課程（${past.length}）</span>
+         <span id="studentEnrolledPastArrow" class="profile-more-arrow">▸</span>
+       </div>
+       <div id="studentEnrolledPastSection" class="profile-more-section collapsed">
+         ${past.map(rowHtml).join('')}
+       </div>`
+    : '';
+
+  wrap.innerHTML = upcomingHtml + pastHtml;
+
+  // 收合邏輯跟個人資料頁「其他資料」區塊同一套寫法：預設收合（collapsed），點一下展開
+  if (past.length) {
+    const toggle = document.getElementById('studentEnrolledPastToggle');
+    const section = document.getElementById('studentEnrolledPastSection');
+    const arrow = document.getElementById('studentEnrolledPastArrow');
+    toggle.addEventListener('click', () => {
+      const nowCollapsed = !section.classList.contains('collapsed');
+      section.classList.toggle('collapsed', nowCollapsed);
+      arrow.textContent = nowCollapsed ? '▸' : '▾';
+    });
+  }
+}
+
 // 該課程有「pending」的訂單 → 顯示「審核中」標籤，同時擋重複加入
 function hasPendingOrder(courseId) {
   return studentOrders.some(o =>
@@ -3013,6 +3069,17 @@ document.getElementById('studentCreditBtn').addEventListener('click', async () =
 
 document.getElementById('studentCreditClose').addEventListener('click', () => {
   document.getElementById('studentCreditOverlay').classList.remove('open');
+});
+
+// 📅 已報名課程（16-2）：資料已在前端記憶體（courses + bookings），不用另外打 Firestore，開窗直接算
+document.getElementById('studentEnrolledBtn').addEventListener('click', () => {
+  document.getElementById('studentDropdown').classList.remove('open');
+  document.getElementById('studentEnrolledOverlay').classList.add('open');
+  renderStudentEnrolledList();
+});
+
+document.getElementById('studentEnrolledClose').addEventListener('click', () => {
+  document.getElementById('studentEnrolledOverlay').classList.remove('open');
 });
 
 // 「其他資料」收合區塊：只影響版面顯示，不影響必填驗證

@@ -231,6 +231,7 @@
 <!-- STUDENT DROPDOWN MENU -->
 <div class="student-dropdown" id="studentDropdown">
   <button class="student-dropdown-item" id="studentCreditBtn">🎫 未用堂數</button>
+  <button class="student-dropdown-item" id="studentEnrolledBtn">📅 已報名課程</button>
   <button class="student-dropdown-item" id="studentProfileBtn">👤 個人資料</button>
   <button class="student-dropdown-item" id="studentLogoutBtn">🚪 登出</button>
 </div>
@@ -254,6 +255,16 @@
     <h3>未用堂數</h3>
     <div id="studentCreditList" style="margin:16px 0"></div>
     <button class="login-cancel" id="studentCreditClose">關閉</button>
+  </div>
+</div>
+
+<!-- STUDENT ENROLLED COURSES OVERLAY -->
+<div class="login-overlay" id="studentEnrolledOverlay">
+  <div class="login-box cart-box">
+    <div style="font-size:2rem;margin-bottom:8px">📅</div>
+    <h3>已報名課程</h3>
+    <div id="studentEnrolledList" style="margin:16px 0"></div>
+    <button class="login-cancel" id="studentEnrolledClose">關閉</button>
   </div>
 </div>
 
