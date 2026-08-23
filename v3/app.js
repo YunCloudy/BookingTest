@@ -549,6 +549,26 @@ function parseCourseStartTime(timeStr) {
   return match ? match[1] : '';
 }
 
+// v3.6：時間欄位改用兩個 <input type="time">（開始／結束）取代手打文字，
+// 解決「上次到底是打 ~ 還是 - 」記不住的問題——分隔符號固定由這裡組出來，不再讓使用者手動打
+const COURSE_TIME_SEP = '~';
+
+// 把「開始時間、結束時間」兩個 HH:MM 組成課程時間欄位存的字串，固定用 ~ 分隔
+// 只有其中一格有填也不擋，兩格都沒填就回傳空字串（沿用舊版「時間可留空」的寬鬆行為）
+function composeCourseTime(startVal, endVal) {
+  const s = (startVal || '').trim();
+  const e = (endVal || '').trim();
+  if (s && e) return `${s}${COURSE_TIME_SEP}${e}`;
+  return s || e || '';
+}
+
+// 把既有課程存的時間字串（可能是新格式 ~ 也可能是舊資料的 - 或其他分隔符號）拆回開始／結束兩個 HH:MM，
+// 供「編輯課程」「複製課程」把舊資料回填進兩個 <input type="time"> 用。抓不到就回傳空字串，讓使用者自己補
+function splitCourseTime(timeStr) {
+  const matches = (timeStr || '').match(/\d{1,2}:\d{2}/g) || [];
+  return { start: matches[0] || '', end: matches[1] || '' };
+}
+
 // ── 共用堂數調整函式 ──
 // 訂單審核完成時「未使用堂數異動」用這個：在原本堂數上累加 delta（可正可負，未來請假退堂也會用）
 // v3.4：多一個 opts.isPurchase，true 的時候會順便把共用到期日延展（筆記第5點）
@@ -1067,7 +1087,11 @@ function renderList() {
           </div>
           <div class="cei-row">
             <span class="cei-label">時間</span>
-            <input type="text" class="cei-input" id="ctime_${c.id}" value="${c.time}" placeholder="20:30~21:30">
+            <div class="cei-time-range">
+              <input type="time" class="cei-input" id="ctimeStart_${c.id}" value="${splitCourseTime(c.time).start}">
+              <span class="cei-time-sep">~</span>
+              <input type="time" class="cei-input" id="ctimeEnd_${c.id}" value="${splitCourseTime(c.time).end}">
+            </div>
           </div>
           <div class="cei-row">
             <span class="cei-label">地點</span>
@@ -1186,7 +1210,10 @@ function renderList() {
           const dow = new Date(+y, +m-1, +d).getDay();
           c.date = `${+m}/${+d}（${DOW_CHARS[dow]}）`;
         }
-        c.time = editSection.querySelector(`#ctime_${c.id}`).value.trim();
+        c.time = composeCourseTime(
+          editSection.querySelector(`#ctimeStart_${c.id}`).value,
+          editSection.querySelector(`#ctimeEnd_${c.id}`).value
+        );
         c.location = editSection.querySelector(`#cloc_${c.id}`).value.trim();
         c.locationDetail = editSection.querySelector(`#clocDetail_${c.id}`).value.trim();
         c.price = parseInt(editSection.querySelector(`#cprice_${c.id}`).value) || 0;
@@ -1258,7 +1285,9 @@ function renderList() {
           const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.value = val; };
           setVal('newTitle', c.title);
           setVal('newDateStr', '');
-          setVal('newTime', c.time);
+          const { start: copyStart, end: copyEnd } = splitCourseTime(c.time);
+          setVal('newTimeStart', copyStart);
+          setVal('newTimeEnd', copyEnd);
           setVal('newLoc', c.location);
           setVal('newLocDetail', c.locationDetail);
           setVal('newPrice', c.price);
@@ -3479,7 +3508,11 @@ function renderAdmin() {
       </div>
       <div class="cei-row">
         <span class="cei-label">時間</span>
-        <input type="text" class="cei-input" id="newTime" placeholder="20:30~21:30">
+        <div class="cei-time-range">
+          <input type="time" class="cei-input" id="newTimeStart">
+          <span class="cei-time-sep">~</span>
+          <input type="time" class="cei-input" id="newTimeEnd">
+        </div>
       </div>
       <div class="cei-row">
         <span class="cei-label">地點</span>
@@ -3577,7 +3610,7 @@ function renderAdmin() {
         subcat: document.getElementById('newSubcat').value,
         dateStr: dateVal,
         date: dateLabel,
-        time: document.getElementById('newTime').value.trim(),
+        time: composeCourseTime(document.getElementById('newTimeStart').value, document.getElementById('newTimeEnd').value),
         title: titleVal,
         location: document.getElementById('newLoc').value.trim(),
         locationDetail: document.getElementById('newLocDetail').value.trim(),

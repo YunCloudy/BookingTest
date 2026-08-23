@@ -1082,6 +1082,24 @@ main { padding: 20px 16px 40px; max-width: 680px; margin: 0 auto; }
   color-scheme: dark;
   padding-right: 36px;
 }
+.cei-input[type="time"] {
+  color-scheme: dark;
+  padding-right: 8px;
+}
+.cei-time-range {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.cei-time-range .cei-input {
+  flex: 1;
+  min-width: 0;
+}
+.cei-time-sep {
+  color: var(--latte-light);
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
 .cei-input::placeholder {
   color: var(--mocha-light);
 }
