@@ -2134,10 +2134,12 @@ function renderStudentEnrolledList() {
   if (!wrap || !currentStudent) return;
 
   const todayStr = new Date().toISOString().slice(0, 10);
+  // 過去課程只保留最近 60 天內的，避免清單無限累積；更久以前的紀錄請回月曆查
+  const cutoffStr = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   const enrolled = courses.filter(c => isEnrolled(c.id));
   const upcoming = enrolled.filter(c => c.dateStr >= todayStr)
     .sort((a, b) => (a.dateStr + a.time).localeCompare(b.dateStr + b.time));
-  const past = enrolled.filter(c => c.dateStr < todayStr)
+  const past = enrolled.filter(c => c.dateStr < todayStr && c.dateStr >= cutoffStr)
     .sort((a, b) => (b.dateStr + b.time).localeCompare(a.dateStr + a.time));
 
   if (enrolled.length === 0) {
@@ -3503,9 +3505,9 @@ function renderAdmin() {
         <div class="cei-spots-header">
          <span class="cei-label">需先付款</span>
           <div class="toggle-row">
-           <span class="toggle-label" id="newRequirePaymentLabel">不需要</span>
+           <span class="toggle-label" id="newRequirePaymentLabel">需要</span>
            <label class="toggle">
-             <input type="checkbox" id="newRequirePayment">
+             <input type="checkbox" id="newRequirePayment" checked>
              <span class="toggle-slider"></span>
            </label>
          </div>
@@ -3906,7 +3908,6 @@ function renderAdmin() {
           </div>
           <div class="order-card-body" style="display:none">
           ${contactHtml}
-          ${order.phone ? `<div class="order-phone">📞 ${order.phone}</div>` : ''}
           <div class="order-courses">${coursesHtml}</div>
           ${order.note ? `<div class="order-note">備註：${order.note}</div>` : ''}
           ${manualAdjustHtml}
