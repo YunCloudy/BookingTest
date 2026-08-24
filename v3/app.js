@@ -3425,8 +3425,8 @@ function renderAdmin() {
     bigCard.innerHTML = `
       <div class="admin-hint">顯示在首頁最上方，標題與內容皆留空則不顯示</div>
       <div class="admin-announce">
-        <input type="text" id="bigAnnounceTitle" class="admin-announce-title-input" placeholder="全域公告" value="${localStorage.getItem('globalNoticeTitle') || document.getElementById('globalNoticeTitle')?.innerText || ''}">
-        <textarea id="bigAnnounce" placeholder="這裡可以寫報名開放時間、活動資訊等">${localStorage.getItem('globalNoticeBody') || document.getElementById('globalNoticeBody')?.innerText || ''}</textarea>
+        <input type="text" id="bigAnnounceTitle" class="admin-announce-title-input" placeholder="全域公告" value="${document.getElementById('globalNoticeTitle')?.innerText || ''}">
+        <textarea id="bigAnnounce" placeholder="這裡可以寫報名開放時間、活動資訊等">${document.getElementById('globalNoticeBody')?.innerText || ''}</textarea>
         <div class="admin-announce-btn-row">
           <button class="save-announce" id="saveBigAnn">儲存</button>
           <button class="edit-toggle-btn" id="notifyBigAnnBtn">📣 發送通知</button>
@@ -3434,7 +3434,7 @@ function renderAdmin() {
       </div>
     `;
     homeSection.appendChild(bigCard);
-    document.getElementById('saveBigAnn').addEventListener('click', () => {
+    document.getElementById('saveBigAnn').addEventListener('click', async () => {
       const title = document.getElementById('bigAnnounceTitle').value.trim();
       const body = document.getElementById('bigAnnounce').value.trim();
       const noticeTitleEl = document.getElementById('globalNoticeTitle');
@@ -3443,9 +3443,16 @@ function renderAdmin() {
       if (noticeTitleEl) noticeTitleEl.innerText = title;
       if (noticeBodyEl) noticeBodyEl.innerText = body;
       if (noticeWrap) noticeWrap.style.display = (title || body) ? '' : 'none';
-      localStorage.setItem('globalNoticeTitle', title);
-      localStorage.setItem('globalNoticeBody', body);
-      alert('大公告已儲存！');
+      const btn = document.getElementById('saveBigAnn');
+      btn.disabled = true;
+      try {
+        await saveToStorage();
+        alert('大公告已儲存！');
+      } catch (err) {
+        alert('儲存失敗，請再試一次');
+      } finally {
+        btn.disabled = false;
+      }
     });
 
     // 21．按下去才發送，存檔本身不自動觸發通知——避免小改錯字也驚動所有學生
