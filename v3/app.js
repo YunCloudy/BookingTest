@@ -550,6 +550,25 @@ function resolveStudentName(nicknameMap, studentId, fallbackName) {
   return (studentId && nicknameMap.get(studentId)) || fallbackName || '未知學生';
 }
 
+// 第19點延伸：搜尋要吃到「暱稱、本名」任一個對上都算——不然學生改了暱稱、老師卻只記得本名，會搜不到人
+// 跟 fetchNicknameMap 分開寫一支，因為這裡多抓一個 realName 欄位，用途不同（一個給顯示、一個給搜尋比對）
+async function fetchSearchProfileMap(studentIds) {
+  const map = new Map(); // studentId → { nickname, realName }
+  const uniqueIds = [...new Set((studentIds || []).filter(Boolean))];
+  await Promise.all(uniqueIds.map(async (uid) => {
+    try {
+      const snap = await getDoc(doc(db, 'users', uid));
+      if (snap.exists()) {
+        const data = snap.data();
+        map.set(uid, { nickname: data.nickname || '', realName: data.realName || '' });
+      }
+    } catch (e) {
+      console.warn('讀取學生資料失敗', uid, e);
+    }
+  }));
+  return map;
+}
+
 // 學生端：把未用堂數畫進「🎫 未用堂數」卡片（v3.3 第二階段，改成獨立卡片，方便未來多老師擴充）
 // v3.4：多帶一個 expireAt（單一共用日期）—— 過期的池子直接不算進可用堂數（畫面上就是消失/變0，不特別標記過期）；
 // 「使用期限」只顯示一次，跟堂數標籤分開放，不重複黏在每個標籤後面
@@ -592,6 +611,23 @@ function composeCourseTime(startVal, endVal) {
 function splitCourseTime(timeStr) {
   const matches = (timeStr || '').match(/\d{1,2}:\d{2}/g) || [];
   return { start: matches[0] || '', end: matches[1] || '' };
+}
+
+// v3.6（第19點延伸）：花名冊是同步渲染的（開啟當下要立刻看到人，不能等網路），
+// 所以做法是「先用舊快照名字渲染出畫面，背景另外抓一次即時暱稱，抓到才局部覆蓋掉對應那一列的文字」，
+// 不會讓花名冊變成要等載入才能開。container 裡每一列的名字要帶 data-roster-name-idx="i" 才抓得到、可以被覆蓋
+async function patchRosterNicknames(container, list) {
+  if (!container || !list || !list.length) return;
+  const ids = [...new Set(list.map(b => b.studentId).filter(Boolean))];
+  if (!ids.length) return;
+  const nicknameMap = await fetchNicknameMap(ids);
+  list.forEach((b, i) => {
+    if (!b.studentId) return;
+    const nickname = nicknameMap.get(b.studentId);
+    if (!nickname || nickname === b.name) return; // 沒抓到、或本來就跟快照一樣就不用動 DOM
+    const el = container.querySelector(`[data-roster-name-idx="${i}"]`);
+    if (el) el.textContent = `${i + 1}. ${nickname}`;
+  });
 }
 
 // ── 共用堂數調整函式 ──
@@ -1193,13 +1229,15 @@ function renderList() {
               ? '<div class="no-roster">尚無報名</div>'
               : bookedList.map((b,i) => `
                 <div class="roster-item">
-                  <div><span class="roster-name">${i+1}. ${b.name}</span>${b.phone ? `　<span class="roster-phone">${b.phone}</span>` : ''}</div>
+                  <div><span class="roster-name" data-roster-name-idx="${i}">${i+1}. ${b.name}</span></div>
                   <div class="roster-time">報名於 ${b.time}</div>
                 </div>`).join('')}
           </div>
         </div>
       `;
       wrapper.appendChild(editSection);
+      // 第19點：這份花名冊跟花名冊 modal 是同一份 bookedList 資料，同樣先渲染舊名字、背景抓一次即時暱稱再覆蓋
+      patchRosterNicknames(editSection, bookedList);
 
       card.querySelector(`#cardEditBtn_${c.id}`).addEventListener('click', (e) => {
         e.stopPropagation();
@@ -1666,8 +1704,7 @@ function buildRosterItemsHtml(course, list) {
   return list.map((b, i) => `
         <div class="modal-roster-item" data-index="${i}">
           <div>
-            <span class="modal-roster-name">${i + 1}. ${b.name}</span>
-            ${b.phone ? `<span class="modal-roster-phone">${b.phone}</span>` : ''}
+            <span class="modal-roster-name" data-roster-name-idx="${i}">${i + 1}. ${b.name}</span>
             ${b.studentId ? '<span class="modal-roster-linked">已登入</span>' : '<span class="modal-roster-guest">訪客</span>'}
             ${b.onLeave ? '<span class="modal-roster-leave-tag">🙋 已請假</span>' : ''}
           </div>
@@ -1716,6 +1753,9 @@ function renderModalRoster(course) {
 function bindModalRosterEvents(course) {
   const tid = teacherId;
 
+  // 第19點：花名冊已經同步渲染出畫面了，這裡背景抓一次即時暱稱回來局部覆蓋，不擋開窗速度
+  patchRosterNicknames(document.getElementById('modalRosterItems'), bookings[course.id] || []);
+
   // 第19點：「手動新增學生」搜尋用的歷史學生名單快取——開窗當下抓一次（含即時暱稱），
   // 之後打字只在這份記憶體清單裡篩選，不會每個字都重新查一次 Firestore
   let studentDirectoryCache = null;
@@ -1737,8 +1777,14 @@ function bindModalRosterEvents(course) {
       }
     });
     const list = [...seen.values()];
-    const nicknameMap = await fetchNicknameMap(list.map(s => s.studentId));
-    list.forEach(s => { s.displayName = resolveStudentName(nicknameMap, s.studentId, s.studentName); });
+    // 第19點延伸：搜尋範圍擴大成「暱稱、本名、email、舊快照名字」任一個對上都算，
+    // 顯示還是只顯示暱稱（displayName），searchText 只用來比對關鍵字，不會被印出來
+    const profileMap = await fetchSearchProfileMap(list.map(s => s.studentId));
+    list.forEach(s => {
+      const p = profileMap.get(s.studentId) || {};
+      s.displayName = p.nickname || s.studentName || '未知學生';
+      s.searchText = [p.nickname, p.realName, s.studentEmail, s.studentName].filter(Boolean).join(' ');
+    });
     studentDirectoryCache = list;
     return list;
   }
@@ -1880,7 +1926,7 @@ function bindModalRosterEvents(course) {
 
     try {
       const directory = await loadStudentDirectory();
-      const results = directory.filter(s => s.displayName.includes(keyword));
+      const results = directory.filter(s => s.searchText.includes(keyword));
 
       if (results.length === 0) {
         dropdown.innerHTML = `<div class="modal-search-hint">找不到此學生的報名紀錄，將以訪客方式新增（不連動帳號）</div>`;
@@ -4789,6 +4835,8 @@ function renderAdmin() {
       // 第19點：即時暱稱優先，抓不到（沒設過暱稱／帳號異常）才 fallback 回訂單快照的舊名字
       // 這裡直接複用剛剛已經撈到的 users/{uid} 內容（s.profile），不用再額外呼叫一次 fetchNicknameMap
       s.displayName = s.profile.nickname || s.studentName || '未知學生';
+      // 第19點延伸：搜尋範圍擴大成「暱稱、本名、email、舊快照名字」任一個對上都算，顯示還是只顯示暱稱
+      s.searchText = [s.profile.nickname, s.profile.realName, s.studentEmail, s.studentName].filter(Boolean).join(' ');
     }));
 
     // 排序要等即時暱稱都到齊才能排，不然順序會跟畫面顯示的名字對不上
@@ -4819,7 +4867,7 @@ function renderAdmin() {
     function renderStudentList(keyword) {
       listWrap.innerHTML = '';
       const kw = (keyword || '').trim();
-      const filtered = kw ? studentList.filter(s => s.displayName.includes(kw)) : studentList;
+      const filtered = kw ? studentList.filter(s => s.searchText.includes(kw)) : studentList;
       if (filtered.length === 0) {
         const hint = document.createElement('div');
         hint.className = 'order-empty-hint';
