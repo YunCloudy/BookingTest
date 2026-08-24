@@ -525,6 +525,31 @@ async function getStudentCredits(tid, studentId) {
   return credits;
 }
 
+// v3.6（第19點）：一次平行抓一批 studentId 的「即時暱稱」，回傳 Map<studentId, nickname>
+// 訂單顯示的學生姓名不再依賴送出當下的文字快照（studentName），統一改成即時 join users/{uid}.nickname，
+// 這樣學生之後改暱稱，老師端訂單管理／學生管理／搜尋都會立刻反映新名字，不會停在改名前的舊名字
+// 抓不到（帳號被刪、從沒設過暱稱等）的人，Map 裡不會有這個 key，呼叫端要自己 fallback 回 studentName 快照
+async function fetchNicknameMap(studentIds) {
+  const nicknameMap = new Map(); // studentId → nickname
+  const uniqueIds = [...new Set((studentIds || []).filter(Boolean))];
+  await Promise.all(uniqueIds.map(async (uid) => {
+    try {
+      const snap = await getDoc(doc(db, 'users', uid));
+      if (snap.exists() && snap.data().nickname) {
+        nicknameMap.set(uid, snap.data().nickname);
+      }
+    } catch (e) {
+      console.warn('讀取學生暱稱失敗', uid, e);
+    }
+  }));
+  return nicknameMap;
+}
+
+// 統一的「顯示名稱」解析：即時暱稱優先，抓不到才 fallback 回訂單/紀錄裡存的舊快照名字，避免顯示空白
+function resolveStudentName(nicknameMap, studentId, fallbackName) {
+  return (studentId && nicknameMap.get(studentId)) || fallbackName || '未知學生';
+}
+
 // 學生端：把未用堂數畫進「🎫 未用堂數」卡片（v3.3 第二階段，改成獨立卡片，方便未來多老師擴充）
 // v3.4：多帶一個 expireAt（單一共用日期）—— 過期的池子直接不算進可用堂數（畫面上就是消失/變0，不特別標記過期）；
 // 「使用期限」只顯示一次，跟堂數標籤分開放，不重複黏在每個標籤後面
@@ -1691,6 +1716,33 @@ function renderModalRoster(course) {
 function bindModalRosterEvents(course) {
   const tid = teacherId;
 
+  // 第19點：「手動新增學生」搜尋用的歷史學生名單快取——開窗當下抓一次（含即時暱稱），
+  // 之後打字只在這份記憶體清單裡篩選，不會每個字都重新查一次 Firestore
+  let studentDirectoryCache = null;
+  async function loadStudentDirectory() {
+    if (studentDirectoryCache) return studentDirectoryCache;
+    const snap = await getDocs(collection(db, 'teachers', tid, 'orders'));
+    const seen = new Map(); // studentId → 最新一筆 order 的快照資料
+    snap.docs.forEach(d => {
+      const data = d.data();
+      if (!data.studentName || !data.studentId) return;
+      if (!seen.has(data.studentId) || data.createdAt > seen.get(data.studentId).createdAt) {
+        seen.set(data.studentId, {
+          studentId: data.studentId,
+          studentName: data.studentName, // fallback 快照
+          studentEmail: data.studentEmail || '',
+          lastCourse: data.courses?.[0]?.title || '',
+          lastDate: data.courses?.[0]?.date || ''
+        });
+      }
+    });
+    const list = [...seen.values()];
+    const nicknameMap = await fetchNicknameMap(list.map(s => s.studentId));
+    list.forEach(s => { s.displayName = resolveStudentName(nicknameMap, s.studentId, s.studentName); });
+    studentDirectoryCache = list;
+    return list;
+  }
+
   // 刪除
   document.querySelectorAll('.modal-delete-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
@@ -1805,6 +1857,10 @@ function bindModalRosterEvents(course) {
     document.getElementById('modalAddBtn').textContent = isOpen ? '＋ 手動新增學生' : '✕ 取消';
     if (!isOpen) {
       setTimeout(() => document.getElementById('modalSearchInput')?.focus(), 50);
+      // 第19點：開窗當下就先預抓一次歷史學生名單＋即時暱稱，不等打字才抓，開啟後續輸入才會是零延遲的記憶體篩選
+      // 每次重新開窗都清快取重抓，確保拿到的是「現在」的暱稱，不會停在上次開窗當下的舊版本
+      studentDirectoryCache = null;
+      loadStudentDirectory();
     }
   });
 
@@ -1822,34 +1878,16 @@ function bindModalRosterEvents(course) {
       return;
     }
 
-    // 從老師的 orders 撈符合名字的學生
     try {
-      const snap = await getDocs(collection(db, 'teachers', tid, 'orders'));
-      const seen = new Map(); // studentId → 最新一筆 order
-      snap.docs.forEach(d => {
-        const data = d.data();
-        if (!data.studentName || !data.studentId) return;
-        if (!data.studentName.includes(keyword)) return;
-        // 同一個 studentId 只保留最新的
-        if (!seen.has(data.studentId) || data.createdAt > seen.get(data.studentId).createdAt) {
-          seen.set(data.studentId, {
-            studentId: data.studentId,
-            studentName: data.studentName,
-            studentEmail: data.studentEmail || '',
-            lastCourse: data.courses?.[0]?.title || '',
-            lastDate: data.courses?.[0]?.date || '',
-            orderId: d.id
-          });
-        }
-      });
+      const directory = await loadStudentDirectory();
+      const results = directory.filter(s => s.displayName.includes(keyword));
 
-      const results = [...seen.values()];
       if (results.length === 0) {
         dropdown.innerHTML = `<div class="modal-search-hint">找不到此學生的報名紀錄，將以訪客方式新增（不連動帳號）</div>`;
       } else {
         dropdown.innerHTML = results.map(r => `
-          <div class="modal-search-item" data-student-id="${r.studentId}" data-student-name="${r.studentName}" data-student-email="${r.studentEmail}" data-last-course="${r.lastCourse}" data-last-date="${r.lastDate}">
-            <span class="modal-search-name">${r.studentName}</span>
+          <div class="modal-search-item" data-student-id="${r.studentId}" data-student-name="${r.displayName}" data-student-email="${r.studentEmail}" data-last-course="${r.lastCourse}" data-last-date="${r.lastDate}">
+            <span class="modal-search-name">${r.displayName}</span>
             <span class="modal-search-meta">${r.lastCourse} ${r.lastDate}</span>
           </div>`).join('');
 
@@ -3740,6 +3778,9 @@ function renderAdmin() {
       creditsMap.set(sid, credits);
       creditExpiryMap.set(sid, expireAt);
     }));
+    // 第19點：即時暱稱 join，只用來覆蓋「畫面顯示」的名字，不動 order.studentName 本身
+    // ── 原始快照仍保留給花名冊(booking.name)等寫入邏輯用，避免波及範圍外的資料 ──
+    const nicknameMap = await fetchNicknameMap(uniqueStudentIds);
 
     orderSection.innerHTML = '';
 
@@ -3936,7 +3977,7 @@ function renderAdmin() {
 
         card.innerHTML = `
           <div class="order-header order-header-toggle">
-            <div class="order-student-name">${order.studentName || '未知學生'}</div>
+            <div class="order-student-name">${resolveStudentName(nicknameMap, order.studentId, order.studentName)}</div>
             <div class="order-date">${dateStr} <span class="order-collapse-arrow">▼</span></div>
           </div>
           <div class="order-card-body" style="display:none">
@@ -4257,7 +4298,7 @@ function renderAdmin() {
               detail: courseSummaryText(order.courses)
             });
             if (currentView === 'calendar') renderCalendar(); else renderList();
-            showToast(`審核完成：${order.studentName}`);
+            showToast(`審核完成：${resolveStudentName(nicknameMap, order.studentId, order.studentName)}`);
             renderOrderSection();
           } catch(e) {
             showToast('操作失敗，請再試一次');
@@ -4293,7 +4334,7 @@ function renderAdmin() {
               message: '您的訂單已取消',
               detail: courseSummaryText(order.courses)
             });
-            showToast(`已取消 ${order.studentName} 的訂單`);
+            showToast(`已取消 ${resolveStudentName(nicknameMap, order.studentId, order.studentName)} 的訂單`);
             renderOrderSection();
           } catch(e) {
             showToast('操作失敗，請再試一次');
@@ -4389,6 +4430,10 @@ function renderAdmin() {
         }
       });
     });
+
+    // 第19點：即時暱稱 join，跟訂單管理同一套做法，只影響顯示，不改 order.studentName 本身
+    const leaveStudentIds = [...new Set(orders.map(o => o.studentId).filter(Boolean))];
+    const nicknameMap = await fetchNicknameMap(leaveStudentIds);
 
     leaveItems.sort((a, b) =>
       (b.order.courses[b.courseIdx].leaveRequestedAt || '').localeCompare(a.order.courses[a.courseIdx].leaveRequestedAt || '')
@@ -4488,7 +4533,7 @@ function renderAdmin() {
 
         card.innerHTML = `
           <div class="order-header">
-            <div class="order-student-name">${order.studentName || '未知學生'}</div>
+            <div class="order-student-name">${resolveStudentName(nicknameMap, order.studentId, order.studentName)}</div>
             ${isPending ? `
               <div class="order-course-actions leave-actions">
                 <button class="order-course-btn-confirm leave-btn-approve" data-order-id="${order.id}" data-course-idx="${courseIdx}">✓</button>
@@ -4624,7 +4669,7 @@ function renderAdmin() {
             const currentCredits = await getStudentCredits(tid, order.studentId);
             const resultTotal = (currentCredits[poolKey] || 0) + delta;
             if (resultTotal < 0) {
-              if (!confirm(`這次異動會讓「${order.studentName}」的${poolLabel(poolKey)}變成 ${resultTotal} 堂（負數），確定要送出嗎？`)) return;
+              if (!confirm(`這次異動會讓「${resolveStudentName(nicknameMap, order.studentId, order.studentName)}」的${poolLabel(poolKey)}變成 ${resultTotal} 堂（負數），確定要送出嗎？`)) return;
             }
           }
 
@@ -4723,7 +4768,7 @@ function renderAdmin() {
           });
         }
       });
-      studentList = [...seen.values()].sort((a, b) => a.studentName.localeCompare(b.studentName, 'zh-Hant'));
+      studentList = [...seen.values()];
     } catch(e) {
       studentSection.innerHTML = '<div style="padding:16px;color:#e74c3c">讀取失敗，請重試</div>';
       return;
@@ -4741,7 +4786,13 @@ function renderAdmin() {
       } catch (e) {
         s.profile = {};
       }
+      // 第19點：即時暱稱優先，抓不到（沒設過暱稱／帳號異常）才 fallback 回訂單快照的舊名字
+      // 這裡直接複用剛剛已經撈到的 users/{uid} 內容（s.profile），不用再額外呼叫一次 fetchNicknameMap
+      s.displayName = s.profile.nickname || s.studentName || '未知學生';
     }));
+
+    // 排序要等即時暱稱都到齊才能排，不然順序會跟畫面顯示的名字對不上
+    studentList.sort((a, b) => a.displayName.localeCompare(b.displayName, 'zh-Hant'));
 
     studentSection.innerHTML = '';
     const title = document.createElement('div');
@@ -4768,7 +4819,7 @@ function renderAdmin() {
     function renderStudentList(keyword) {
       listWrap.innerHTML = '';
       const kw = (keyword || '').trim();
-      const filtered = kw ? studentList.filter(s => s.studentName.includes(kw)) : studentList;
+      const filtered = kw ? studentList.filter(s => s.displayName.includes(kw)) : studentList;
       if (filtered.length === 0) {
         const hint = document.createElement('div');
         hint.className = 'order-empty-hint';
@@ -4794,7 +4845,7 @@ function renderAdmin() {
         card.style.marginBottom = '10px';
         card.innerHTML = `
           <div class="order-header">
-            <div class="order-student-name">${s.studentName}</div>
+            <div class="order-student-name">${s.displayName}</div>
             ${expiryLine}
           </div>
           <div class="credit-tags" style="margin:6px 0 0">
@@ -4802,11 +4853,11 @@ function renderAdmin() {
               ? poolEntries.map(([pk, v]) => `<span class="credit-tag">${poolLabel(pk)}　剩餘 <b>${v}</b> 堂</span>`).join('')
               : `<span class="credit-tag credit-tag-empty">尚無未用堂數</span>`}
           </div>
-          <div class="credit-manual-wrap" data-student-id="${s.studentId}" data-student-name="${s.studentName}">
+          <div class="credit-manual-wrap" data-student-id="${s.studentId}" data-student-name="${s.displayName}">
             <div style="display:flex; gap:8px; flex-wrap:wrap;">
               <button class="credit-manual-toggle" type="button">✍️手動調整堂數</button>
-              <button class="credit-extend-btn" type="button" data-student-id="${s.studentId}" data-student-name="${s.studentName}">📅延展到期日</button>
-              <button class="credit-zero-btn" type="button" data-student-id="${s.studentId}" data-student-name="${s.studentName}">🧹堂數歸零</button>
+              <button class="credit-extend-btn" type="button" data-student-id="${s.studentId}" data-student-name="${s.displayName}">📅延展到期日</button>
+              <button class="credit-zero-btn" type="button" data-student-id="${s.studentId}" data-student-name="${s.displayName}">🧹堂數歸零</button>
             </div>
             <div class="credit-manual-form" style="display:none">
               <select class="credit-manual-pool">
