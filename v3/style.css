@@ -977,6 +977,16 @@ main { padding: 20px 16px 40px; max-width: 680px; margin: 0 auto; }
   margin-top: 6px;
   font-family: 'Noto Sans TC', sans-serif;
 }
+.admin-announce-btn-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.admin-announce-btn-row .save-announce,
+.admin-announce-btn-row .edit-toggle-btn {
+  margin-top: 6px;
+}
 
 .edit-toggle-btn {
   background: none;

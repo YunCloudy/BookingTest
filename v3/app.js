@@ -2463,6 +2463,16 @@ function courseSummaryText(courses) {
   return courses.length > 1 ? `${base}\u3000等時段` : base;
 }
 
+// 21．公告更改通知：從指定課程 id 清單的報名紀錄，整理出不重複的已登入學生 id
+// （全域大公告傳全部課程 id；分類中公告只傳該分類底下的課程 id）
+function getStudentIdsFromBookings(courseIds) {
+  const ids = new Set();
+  courseIds.forEach(cid => {
+    (bookings[cid] || []).forEach(b => { if (b.studentId) ids.add(b.studentId); });
+  });
+  return Array.from(ids);
+}
+
 async function pushNotification(pathType, ownerId, { type, message, detail }) {
   if (!ownerId) return;
   try {
@@ -3417,7 +3427,10 @@ function renderAdmin() {
       <div class="admin-announce">
         <input type="text" id="bigAnnounceTitle" class="admin-announce-title-input" placeholder="全域公告" value="${localStorage.getItem('globalNoticeTitle') || document.getElementById('globalNoticeTitle')?.innerText || ''}">
         <textarea id="bigAnnounce" placeholder="這裡可以寫報名開放時間、活動資訊等">${localStorage.getItem('globalNoticeBody') || document.getElementById('globalNoticeBody')?.innerText || ''}</textarea>
-        <button class="save-announce" id="saveBigAnn">儲存</button>
+        <div class="admin-announce-btn-row">
+          <button class="save-announce" id="saveBigAnn">儲存</button>
+          <button class="edit-toggle-btn" id="notifyBigAnnBtn">📣 發送通知</button>
+        </div>
       </div>
     `;
     homeSection.appendChild(bigCard);
@@ -3433,6 +3446,30 @@ function renderAdmin() {
       localStorage.setItem('globalNoticeTitle', title);
       localStorage.setItem('globalNoticeBody', body);
       alert('大公告已儲存！');
+    });
+
+    // 21．按下去才發送，存檔本身不自動觸發通知——避免小改錯字也驚動所有學生
+    document.getElementById('notifyBigAnnBtn').addEventListener('click', async (e) => {
+      const title = document.getElementById('bigAnnounceTitle').value.trim();
+      if (!title) { showToast('請先填寫公告標題再發送通知'); return; }
+      const targets = getStudentIdsFromBookings(courses.map(c => c.id));
+      if (targets.length === 0) { showToast('目前沒有已登入學生可以通知'); return; }
+      if (!confirm(`確定要發送「公告已更新」通知給全部 ${targets.length} 位已登入學生嗎？`)) return;
+      const btn = e.target;
+      btn.disabled = true; btn.textContent = '發送中…';
+      try {
+        for (const sid of targets) {
+          await pushNotification('users', sid, {
+            type: 'announcement_update',
+            message: `公告已更新：${title}`,
+            detail: ''
+          });
+        }
+        showToast(`已發送通知給 ${targets.length} 位學生`);
+      } catch (err) {
+        showToast('發送失敗，請再試一次');
+      }
+      btn.disabled = false; btn.textContent = '📣 發送通知';
     });
 
     // 首頁區塊
@@ -3482,7 +3519,10 @@ function renderAdmin() {
           <div class="admin-announce admin-announce-spaced">
             <div class="admin-hint">📢 顯示在該類別課程上方</div>
             <textarea id="${midId}" placeholder="留空則不顯示">${cat.announceMid}</textarea>
-            <button class="save-announce" id="saveMid_${cat.id}">儲存</button>
+            <div class="admin-announce-btn-row">
+              <button class="save-announce" id="saveMid_${cat.id}">儲存</button>
+              <button class="edit-toggle-btn" id="notifyMid_${cat.id}">📣 發送通知</button>
+            </div>
           </div>
         </div>
       `;
@@ -3499,6 +3539,31 @@ function renderAdmin() {
         cat.announceMid = document.getElementById(midId).value.trim();
         saveToStorage();
         alert(`已儲存「${cat.label}」課程公告`);
+      });
+
+      // 21．分類公告只發給該分類底下課程有報名記錄的學生，不地毯式發送
+      document.getElementById(`notifyMid_${cat.id}`).addEventListener('click', async (e) => {
+        const content = document.getElementById(midId).value.trim();
+        if (!content) { showToast('請先填寫公告內容再發送通知'); return; }
+        const courseIds = courses.filter(c => c.cat === cat.id).map(c => c.id);
+        const targets = getStudentIdsFromBookings(courseIds);
+        if (targets.length === 0) { showToast('這個分類目前沒有已報名的學生可以通知'); return; }
+        if (!confirm(`確定要發送「公告已更新」通知給「${cat.label}」分類 ${targets.length} 位學生嗎？`)) return;
+        const btn = e.target;
+        btn.disabled = true; btn.textContent = '發送中…';
+        try {
+          for (const sid of targets) {
+            await pushNotification('users', sid, {
+              type: 'announcement_update',
+              message: `公告已更新：${cat.label}`,
+              detail: ''
+            });
+          }
+          showToast(`已發送通知給 ${targets.length} 位學生`);
+        } catch (err) {
+          showToast('發送失敗，請再試一次');
+        }
+        btn.disabled = false; btn.textContent = '📣 發送通知';
       });
     });
 
