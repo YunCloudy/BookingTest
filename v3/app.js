@@ -2073,7 +2073,7 @@ function openModal(course) {
   return `
   <div class="modal-roster">
     <div class="modal-roster-title">已報名學員（${roster.length} 人）</div>
-    <div>${roster.map((b,i) => `<div class="modal-roster-item"><span class="modal-roster-name">${i+1}. ${b.name}</span></div>`).join('')}</div>
+    <div>${roster.map((b,i) => `<div class="modal-roster-item"><span class="modal-roster-name" data-roster-name-idx="${i}">${i+1}. ${b.name}</span></div>`).join('')}</div>
   </div>`;
 })() : ''}
 ${isAdmin() ? renderModalRoster(course) : (hasPendingLeave(course.id) ? `
@@ -2119,6 +2119,10 @@ ${isAdmin() ? renderModalRoster(course) : (hasPendingLeave(course.id) ? `
     const leaveRequestBtn = document.getElementById('leaveRequestBtn');
     if (leaveRequestBtn) {
       leaveRequestBtn.addEventListener('click', () => submitLeaveRequest(course));
+    }
+    // 第19點：學生端「已報名學員」名單同樣先渲染舊快照名字，背景抓一次即時暱稱再覆蓋，跟教練後台花名冊同一套做法
+    if (course.showRoster) {
+      patchRosterNicknames(document.getElementById('modalContent'), bookings[course.id] || []);
     }
   }
   document.getElementById('closeModalBtn').addEventListener('click', closeModal);
