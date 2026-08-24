@@ -99,7 +99,7 @@ const categories = [
 const homeSections = {
   notice:      { id: 'noticeRules',        icon: '📋', title: '上課注意事項', text: '這裡可以寫報名方式、特殊課程規則、堂數期限提醒、其他你想讓學生知道的事項等等' },
   about:       { id: 'sectionAbout',       icon: '✨', title: '關於課程',     text: '這裡可以簡述課程特色、希望能帶給學生的效果/收獲、或其他你在意的重點等等' },
-  booking:     { id: 'sectionBooking',     icon: '📣', title: '報名說明',     text: '這裡可以寫報名管道（例如私訊、線上表單）、揪團、包班等特殊需求說明' },
+  booking:     { id: 'sectionBooking',     icon: '💡', title: '報名說明',     text: '這裡可以寫報名管道（例如私訊、線上表單）、揪團、包班等特殊需求說明' },
   courseIntro: { id: 'sectionCourseIntro', icon: '🧘', title: '其他注意事項', text: '註記：所有欄位都可以自由利用，非硬性限定，若有其他希望增加的重點欄位建議，都歡迎聯繫開發者☺️' },
 };
 
@@ -3626,7 +3626,7 @@ function renderAdmin() {
     // 新增課程
     const addTitle = document.createElement('div');
     addTitle.className = 'admin-section-title';
-    addTitle.textContent = '💡 新增課程';
+    addTitle.textContent = '新增課程';
     courseSection.appendChild(addTitle);
 
     const addCard = document.createElement('div');
