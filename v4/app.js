@@ -24,7 +24,7 @@
 //
 // ══════════════════════════════════════════
 //
-// ⚠️ TODO：目前 teacherId 寫死為測試值 'test_aerial'
+// ⚠️ TODO：目前 teacherId 寫死為測試值 'dev_aerial'
 //    等 Google 登入完成後，改為動態讀取登入者的 uid
 //    const teacherId = auth.currentUser.uid;
 //
@@ -59,7 +59,7 @@ let currentStudentCredits = {}; // 學生登入後自己的未用堂數（從 us
 let currentStudentCreditExpiry = null; // 共用堂數到期日（從 users/{uid}.creditExpiry 讀，單一日期字串，v3.4）
 
 // ── CART ──
-const TEACHER_ID_STATIC = 'test_aerial';
+const TEACHER_ID_STATIC = 'dev_aerial';
 let cart = []; // [{ courseId, title, date, time, price }]
 
 // ── DATA ──
