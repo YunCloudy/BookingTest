@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>課程預約</title>
+<script>
+// 🛠️ 除錯用：任何 JS 錯誤都會直接顯示在畫面最上方，方便手機直接看錯誤訊息（除錯完可以整段刪掉）
+(function() {
+  var box = document.createElement('div');
+  box.id = 'debugErrorBox';
+  box.style.cssText = 'display:none;position:fixed;top:0;left:0;right:0;z-index:99999;background:#c0392b;color:#fff;font-size:12px;line-height:1.5;padding:10px 12px;max-height:50vh;overflow:auto;white-space:pre-wrap;word-break:break-all;font-family:monospace;';
+  document.addEventListener('DOMContentLoaded', function() { document.body.prepend(box); });
+  function show(msg) {
+    box.style.display = 'block';
+    box.textContent += msg + '\n\n';
+  }
+  window.addEventListener('error', function(e) {
+    show('❌ ' + e.message + '\n檔案: ' + e.filename + '\n行: ' + e.lineno + ' 欄: ' + e.colno + (e.error && e.error.stack ? '\n' + e.error.stack : ''));
+  });
+  window.addEventListener('unhandledrejection', function(e) {
+    show('❌ Promise 錯誤: ' + (e.reason && e.reason.message ? e.reason.message : e.reason));
+  });
+})();
+</script>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;600;700&family=Noto+Sans+TC:wght@300;400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- STUDENT VIEW -->
+<div id="studentView">
+  <header>
+    <div>
+      <h1>🌸 課程預約</h1>
+      <div class="subtitle">AERIAL BOOKING</div>
+    </div>
+    <div class="header-btns">
+      <button id="loginBtn">登入 ▾</button>
+      <button id="notifBtn" class="notif-btn" style="display:none">🔔<span id="notifCount" class="notif-badge" style="display:none"></span></button>
+      <button id="cartBtn" class="cart-btn">🛍️<span id="cartCount" class="cart-badge" style="display:none"></span></button>
+<!--   <button id="teacherAdminBtn" class="cart-btn" style="display:none">🔧後台</button> -->
+    </div>
+  </header>
+
+  <div class="tabs">
+   <div class="tab active" data-view="calendar">本月課表</div>
+    <div class="tab" data-view="list" data-cat="all">全部課程</div>
+    <div class="tab" data-view="list" data-cat="aerial">空中瑜珈</div>
+    <div class="tab" data-view="list" data-cat="pilates">皮拉提斯</div>
+    <div class="tab" data-view="list" data-cat="circus">旋轉課</div>
+  </div>
+
+  <main>
+    <div class="notice" id="globalNoticeWrap">
+      <div id="globalNoticeTitle" style="font-weight:700;margin-bottom:4px;">🗓 最新公告</div>
+      <div id="globalNoticeBody">報名開放時間將另行公告，敬請留意！</div>
+    </div>
+
+    <!-- LIST VIEW -->
+    <div id="listView" style="display:none"></div>
+
+    <!-- CALENDAR VIEW -->
+    <div id="calendarView">
+      <div class="calendar-wrap">
+        <div class="cal-nav">
+          <button id="calPrev">‹</button>
+          <h3 id="calTitle"></h3>
+          <button id="calNext">›</button>
+        </div>
+        <div class="cal-grid" id="calGrid"></div>
+      </div>
+      <div id="dayDetail"></div>
+      <div id="noticeRules" class="notice-rules"></div>
+      <div id="sectionAbout" class="notice-rules"></div>
+      <div id="sectionBooking" class="notice-rules"></div>
+      <div id="sectionCourseIntro" class="notice-rules"></div>
+    </div>
+  </main>
+</div>
+
+<!-- LOGIN MODAL -->
+<div class="login-overlay" id="loginOverlay">
+  <div class="login-box">
+    <div style="font-size:2rem;margin-bottom:8px">💮</div>
+    <h3>老師登入</h3>
+    <p>使用 Google 帳號登入</p>
+    <button class="btn-google" id="teacherGoogleLoginBtn">
+      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="18" style="vertical-align:middle;margin-right:8px">
+      以 Google 登入
+    </button>
+    <p>請登入以使用後台</p>
+    <div class="login-error" id="loginError"></div>
+    <button class="login-cancel" id="loginCancel">取消</button>
+  </div>
+</div>
+
+<!-- TEACHER APPLY OVERLAY（18．教室資料／申請表單） -->
+<div class="login-overlay" id="teacherApplyOverlay">
+  <div class="login-box">
+    <div style="font-size:2rem;margin-bottom:8px">🏠</div>
+    <h3 id="teacherApplyTitle">教室申請</h3>
+
+    <div id="teacherApplyFormWrap">
+      <p style="font-size:0.8rem;color:#7a6560;margin-bottom:12px">這個帳號還沒有老師權限，填寫以下資料送出教室申請</p>
+      <div style="text-align:left;margin-bottom:6px;font-size:0.82rem;color:#7a6560">老師名稱</div>
+      <p style="text-align:left;font-size:0.75rem;color:#aaa;margin:0 0 4px">想讓學生怎麼稱呼你</p>
+      <input type="text" id="applyTeacherNameInput" maxlength="20" style="margin-bottom:12px">
+
+      <div style="text-align:left;margin-bottom:6px;font-size:0.82rem;color:#7a6560">教室名稱</div>
+      <p style="text-align:left;font-size:0.75rem;color:#aaa;margin:0 0 4px">網頁左上角的標題</p>
+      <input type="text" id="applyStudioNameInput" maxlength="20" style="margin-bottom:12px">
+
+      <div style="text-align:left;margin-bottom:6px;font-size:0.82rem;color:#7a6560">IG 帳號</div>
+      <p style="text-align:left;font-size:0.75rem;color:#aaa;margin:0 0 4px">方便核對是誰申請的</p>
+      <input type="text" id="applyIgInput" maxlength="30" style="margin-bottom:12px">
+
+      <div style="text-align:left;margin-bottom:6px;font-size:0.82rem;color:#7a6560">帳號/網頁ID（選填）</div>
+      <p style="text-align:left;font-size:0.75rem;color:#aaa;margin:0 0 4px">限英文數字，留空預設帶入IG帳號</p>
+      <input type="text" id="applySlugInput" maxlength="30" style="margin-bottom:12px">
+
+      <div style="text-align:left;margin-bottom:6px;font-size:0.82rem;color:#7a6560">備用聯繫方式（選填）</div>
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <select id="applyContactType" style="flex:0 0 88px">
+          <option value="mail">Mail</option>
+          <option value="line">LINE</option>
+          <option value="ig">IG</option>
+        </select>
+        <input type="text" id="applyContactValue" placeholder="輸入聯繫帳號／信箱" maxlength="50" style="flex:1">
+      </div>
+      <div class="login-error" id="teacherApplyError"></div>
+      <button class="btn-primary" id="teacherApplySubmit" style="width:100%">送出申請</button>
+    </div>
+
+    <div id="teacherApplyStatusWrap" style="display:none">
+      <p id="teacherApplyStatusText" style="font-size:0.88rem;color:var(--brown-dark);line-height:1.6"></p>
+    </div>
+
+    <button class="login-cancel" id="teacherApplyCancel">關閉</button>
+  </div>
+</div>
+
+<!-- STUDENT LOGIN MODAL -->
+<div class="login-overlay" id="studentLoginOverlay">
+  <div class="login-box">
+    <div style="font-size:2rem;margin-bottom:8px">🌸</div>
+    <h3>學生登入</h3>
+    <p>使用 Google 帳號登入</p>
+    <button class="btn-google" id="googleLoginBtn">
+      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="18" style="vertical-align:middle;margin-right:8px">
+      以 Google 登入
+    </button>
+    <p>請登入以送出訂單</p>
+    <div class="login-error" id="studentLoginError"></div>
+    <button class="login-cancel" id="studentLoginCancel">取消</button>
+  </div>
+</div>
+
+<!-- LOGIN DROPDOWN（未登入） -->
+<div class="student-dropdown" id="loginDropdown">
+  <button class="student-dropdown-item" id="teacherLoginDropBtn">💮 老師登入</button>
+  <button class="student-dropdown-item" id="studentLoginDropBtn">🌸 學生登入</button>
+</div>
+
+<!-- TEACHER DROPDOWN（老師登入後） -->
+<div class="student-dropdown" id="teacherDropdown">
+  <button class="student-dropdown-item" id="teacherStudioBtn">🏫 教室資料</button>
+  <button class="student-dropdown-item" id="teacherLogoutBtn">🚪 登出</button>
+</div>
+
+<!-- TEACHER STUDIO PROFILE（教室資料編輯，v3.5） -->
+<div class="login-overlay" id="teacherStudioOverlay">
+  <div class="login-box">
+    <div style="font-size:2rem;margin-bottom:8px">🏫</div>
+    <h3>教室資料</h3>
+
+    <div style="text-align:left;margin-bottom:6px;font-size:0.82rem;color:#7a6560">老師名稱</div>
+    <p style="text-align:left;font-size:0.75rem;color:#aaa;margin:0 0 4px">想讓學生怎麼稱呼你</p>
+    <input type="text" id="studioTeacherNameInput" maxlength="20" style="margin-bottom:12px">
+
+    <div style="text-align:left;margin-bottom:6px;font-size:0.82rem;color:#7a6560">教室名稱</div>
+    <p style="text-align:left;font-size:0.75rem;color:#aaa;margin:0 0 4px">網頁左上角的標題</p>
+    <input type="text" id="studioNameInput" maxlength="20" style="margin-bottom:12px">
+
+    <div style="text-align:left;margin-bottom:6px;font-size:0.82rem;color:#7a6560">IG 帳號</div>
+    <p style="text-align:left;font-size:0.75rem;color:#aaa;margin:0 0 4px">方便核對是誰</p>
+    <input type="text" id="studioIgInput" maxlength="30" style="margin-bottom:12px">
+
+    <div style="text-align:left;margin-bottom:6px;font-size:0.82rem;color:#7a6560">帳號/網頁ID（選填）</div>
+    <p style="text-align:left;font-size:0.75rem;color:#aaa;margin:0 0 4px">限英文數字，留空預設帶入IG帳號</p>
+    <input type="text" id="studioSlugInput" maxlength="30" style="margin-bottom:12px">
+
+    <div style="text-align:left;margin-bottom:6px;font-size:0.82rem;color:#7a6560">備用聯繫方式（選填）</div>
+    <div style="display:flex;gap:8px;margin-bottom:12px">
+      <select id="studioContactType" style="flex:0 0 88px">
+        <option value="mail">Mail</option>
+        <option value="line">LINE</option>
+        <option value="ig">IG</option>
+      </select>
+      <input type="text" id="studioContactValue" maxlength="50" style="flex:1">
+    </div>
+
+    <div class="login-error" id="teacherStudioError"></div>
+    <button class="btn-primary" id="teacherStudioSave" style="width:100%">儲存</button>
+    <br>
+    <button class="login-cancel" id="teacherStudioCancel">關閉</button>
+  </div>
+</div>
+
+<!-- TEACHER LOGOUT CONFIRM -->
+<div class="login-overlay" id="teacherLogoutOverlay">
+  <div class="login-box">
+    <div style="font-size:2rem;margin-bottom:8px">👋</div>
+    <h3 id="teacherLogoutName">登出</h3>
+    <p>確定要登出嗎？</p>
+    <button class="btn-primary" id="teacherLogoutConfirm" style="width:100%">登出</button>
+    <br>
+    <button class="login-cancel" id="teacherLogoutCancel">取消</button>
+  </div>
+</div>
+
+<!-- NOTIFICATION DROPDOWN -->
+<div class="student-dropdown notif-dropdown" id="notifDropdown">
+  <div class="notif-dropdown-title">🔔 通知</div>
+  <div class="notif-list" id="notifList">
+    <div class="notif-empty">目前沒有通知</div>
+  </div>
+  <button class="notif-clear-btn" id="notifClearBtn" style="display:none">🗑️ 清除通知</button>
+</div>
+
+<!-- STUDENT DROPDOWN MENU -->
+<div class="student-dropdown" id="studentDropdown">
+  <button class="student-dropdown-item" id="studentCreditBtn">🎫 未用堂數</button>
+  <button class="student-dropdown-item" id="studentEnrolledBtn">📅 已報名課程</button>
+  <button class="student-dropdown-item" id="studentProfileBtn">👤 個人資料</button>
+  <button class="student-dropdown-item" id="studentLogoutBtn">🚪 登出</button>
+</div>
+
+<!-- STUDENT LOGOUT CONFIRM -->
+<div class="login-overlay" id="studentLogoutOverlay">
+  <div class="login-box">
+    <div style="font-size:2rem;margin-bottom:8px">👋</div>
+    <h3 id="studentLogoutName">登出</h3>
+    <p>確定要登出嗎？</p>
+    <button class="btn-primary" id="studentLogoutConfirm" style="width:100%">登出</button>
+    <br>
+    <button class="login-cancel" id="studentLogoutCancel">取消</button>
+  </div>
+</div>
+
+<!-- STUDENT CREDIT OVERLAY -->
+<div class="login-overlay" id="studentCreditOverlay">
+  <div class="login-box">
+    <div style="font-size:2rem;margin-bottom:8px">🎫</div>
+    <h3>未用堂數</h3>
+    <div id="studentCreditList" style="margin:16px 0"></div>
+    <button class="login-cancel" id="studentCreditClose">關閉</button>
+  </div>
+</div>
+
+<!-- STUDENT ENROLLED COURSES OVERLAY -->
+<div class="login-overlay" id="studentEnrolledOverlay">
+  <div class="login-box cart-box">
+    <div style="font-size:2rem;margin-bottom:8px">📅</div>
+    <h3>已報名課程</h3>
+    <div id="studentEnrolledList" style="margin:16px 0"></div>
+    <button class="login-cancel" id="studentEnrolledClose">關閉</button>
+  </div>
+</div>
+
+<!-- STUDENT PROFILE OVERLAY -->
+<div class="login-overlay" id="studentProfileOverlay">
+  <div class="login-box">
+    <div style="font-size:2rem;margin-bottom:8px">👤</div>
+    <h3>個人資料</h3>
+    <p id="studentProfileEmail" style="font-size:0.78rem;color:#999;margin-bottom:16px"></p>
+    <div style="text-align:left;margin-bottom:6px;font-size:0.82rem;color:#7a6560">暱稱</div>
+    <input type="text" id="studentNicknameInput" placeholder="輸入暱稱" maxlength="20" style="margin-bottom:12px">
+    <div style="text-align:left;margin-bottom:6px;font-size:0.82rem;color:#7a6560">聯絡電話</div>
+    <input type="tel" id="studentPhoneInput" placeholder="輸入電話" maxlength="15" style="margin-bottom:12px">
+
+    <div id="studentProfileMoreToggle" class="profile-more-toggle">
+      <span id="studentProfileMoreLabel">其他資料</span>
+      <span id="studentProfileMoreArrow" class="profile-more-arrow">▾</span>
+    </div>
+    <div id="studentProfileMoreSection" class="profile-more-section">
+      <div style="text-align:left;margin-bottom:6px;font-size:0.82rem;color:#7a6560">本名</div>
+      <input type="text" id="studentRealNameInput" placeholder="輸入本名" maxlength="20" style="margin-bottom:12px">
+      <div style="text-align:left;margin-bottom:6px;font-size:0.82rem;color:#7a6560">緊急聯絡人姓名</div>
+      <input type="text" id="studentEmergencyNameInput" placeholder="輸入緊急聯絡人姓名" maxlength="20" style="margin-bottom:12px">
+      <div style="text-align:left;margin-bottom:6px;font-size:0.82rem;color:#7a6560">緊急聯絡人電話</div>
+      <input type="tel" id="studentEmergencyPhoneInput" placeholder="輸入緊急聯絡人電話" maxlength="15" style="margin-bottom:12px">
+    </div>
+
+    <div id="studentProfileError" class="login-error"></div>
+    <button class="btn-primary" id="studentProfileSave" style="width:100%">儲存</button>
+    <br>
+    <button class="login-cancel" id="studentProfileCancel">取消</button>
+  </div>
+</div>
+
+<!-- TOAST 通知 -->
+<div id="toastNotice" class="toast-notice"></div>
+
+<!-- ADMIN PANEL -->
+
+<div id="adminPanel">
+  <div class="admin-header">
+    <h2>🌸 老師管理後台</h2>
+    <button id="closeAdmin">← 返回</button>
+  </div>
+  <div class="admin-body" id="adminBody"></div>
+</div>
+
+<!-- MODAL -->
+<div class="overlay" id="overlay">
+  <div class="modal" id="modal">
+    <div class="modal-handle"></div>
+    <div id="modalContent"></div>
+  </div>
+</div>
+<!-- 登入成功畫面 -->
+<div id="loginSuccess">
+  <div class="login-success-icon">✨</div>
+  <div class="login-success-title" id="loginSuccessName">歡迎回來！</div>
+  <div class="login-success-sub">正在進入管理後台…</div>
+</div>
+
+
+<!-- CART OVERLAY -->
+<div class="login-overlay" id="cartOverlay">
+  <div class="login-box cart-box">
+    <div style="font-size:2rem;margin-bottom:4px">🛒</div>
+    <h3>購物車</h3>
+    <div id="cartItems"></div>
+    <div id="cartCheckoutForm" style="display:none">
+      <div class="cart-divider"></div>
+      <div id="cartQuickForm">
+        <div class="cart-field-label">你的名稱</div>
+        <input type="text" id="cartName" placeholder="輸入暱稱" maxlength="20">
+        <div class="cart-field-label">聯絡電話</div>
+        <input type="tel" id="cartPhone" placeholder="輸入電話" maxlength="15">
+      </div>
+      <div id="cartProfileSummaryWrap" style="display:none">
+        <div class="cart-field-label cart-profile-label-row">
+          <span>個人資料</span>
+          <button type="button" id="cartEditProfileLink" class="cart-edit-link">✏️ 編輯</button>
+        </div>
+        <div id="cartProfileSummary" class="cart-profile-summary">
+          <div class="cart-profile-summary-row"><span class="cart-summary-key">暱稱</span><span id="cartSummaryNickname"></span></div>
+          <div class="cart-profile-summary-row"><span class="cart-summary-key">聯絡電話</span><span id="cartSummaryPhone"></span></div>
+        </div>
+      </div>
+      <div class="cart-field-label">備註（選填）</div>
+      <textarea id="cartNote" placeholder="補充說明（例如第一次體驗、特殊需求，限100字）" maxlength="100"></textarea>
+      <button class="btn-primary" id="cartSubmitBtn" style="width:100%;margin-top:8px">送出訂單</button>
+    </div>
+    <button class="login-cancel" id="cartCloseBtn">關閉</button>
+  </div>
+</div>
+
+<!-- Firebase CDN -->
+<!-- ⚠️ TODO：待 Google 登入完成後，app.js 內的 teacherId 需改為動態讀取 uid -->
+<script type="module" src="app.js"></script>
+</body>
+</html>
